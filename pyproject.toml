@@ -1,17 +1,20 @@
 [project]
 name = "meteor-mcp"
 version = "0.0.1"
-description = "Meteor scatter MCP server — in development"
+description = "Meteor scatter MCP server: shower timing, radiant geometry between two stations, live counts"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
 authors = [{name = "Greg Beam, KI7MT", email = "maintainers@qso-graph.io"}]
 requires-python = ">=3.10"
 dependencies = [
     "fastmcp>=4.0,<5",
+    # A current root set. NASA's API chains to a Sectigo root that older
+    # system OpenSSL stores do not carry; see live.py.
+    "certifi",
 ]
 keywords = ["amateur-radio", "ham-radio", "qso-graph", "mcp", "model-context-protocol"]
 classifiers = [
-    "Development Status :: 1 - Planning",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Topic :: Communications :: Ham Radio",
     "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
