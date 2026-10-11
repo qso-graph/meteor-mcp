@@ -85,13 +85,15 @@ The fields are **ADIF's**, not invented here:
 | `MY_GRIDSQUARE_EXT` | Characters 9–12 of a 10- or 12-character locator |
 | `MY_LAT` / `MY_LON` | An exact position, when the station has one |
 
-**A grid is what hams actually use**, and four characters is what goes over the air: the
-FT8 and MSK144 structured message payload carries a 4-character grid, and 6 or 8
-characters only ever reach a log. Since meteor scatter *is* MSK144, a 4-character locator
-off a decode is the normal input here, not a degraded one.
+**A grid is what hams actually use**, so a locator is the normal input here, not a
+degraded one. It may carry 4, 6 or 8 characters — operators commonly state 6 or 8 for
+their own station, while a standard WSJT-X exchange is usually 4, and 4 is the safe floor
+to plan around when nothing says otherwise.
 
-A grid square is a rectangle, though, and its centre is all a locator gives. Four
-characters is about ±100 km per end, so a path length carries about **±200 km** of slack.
+A grid square is a rectangle, though, and its centre is all a locator gives. Nothing here
+assumes a precision: the slack is computed from the characters each locator actually
+carried. At 4 characters that is about ±100 km per end, so a path length carries about
+**±200 km** of slack; at 6 it falls to a few km.
 That is immaterial on a 1100 km path and decisive against a threshold — a path reported as
 2250 km could be 2050 to 2450, which straddles the 2300 km single-hop limit. When a limit
 falls inside that slack the answer says the call **cannot be decided** at on-air precision,

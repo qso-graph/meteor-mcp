@@ -502,18 +502,24 @@ class TestTheSummaryLeadsWithWhatMatters:
         assert answer["summary"].startswith("Workable")
 
 
-class TestOnAirPrecision:
-    """Four characters is what goes over the air, so it is the normal case.
+class TestLocatorPrecision:
+    """A locator's precision decides what it can settle, and it varies.
 
-    The FT8 and MSK144 structured message payload carries a 4-character grid;
-    6 and 8 characters only ever reach a log. Meteor scatter *is* MSK144, so
-    the far end of a path is normally known to about 100 km and the path
-    length to about 200 km. That is immaterial mid-range and decisive against
-    a threshold.
+    Operators commonly state 6 or 8 characters for their own station, while a
+    standard WSJT-X exchange is usually 4, so 4 is the floor worth planning
+    around. Nothing asserts which arrives — the slack is measured from the
+    characters each locator actually carried. At 4 characters an end is known
+    to about 100 km and a path length to about 200 km: immaterial mid-range,
+    decisive against a threshold.
     """
 
-    def test_a_four_character_grid_is_about_a_hundred_km_of_slack(self) -> None:
-        """MET-090: the quantity, so the note below is not arbitrary."""
+    def test_precision_drives_the_slack_rather_than_an_assumption(self) -> None:
+        """MET-090: the quantity, measured per locator, so the note is not arbitrary.
+
+        This is the test that keeps the behaviour independent of any belief
+        about what a given mode transmits: more characters must mean sharply
+        less slack, whatever precision happens to arrive.
+        """
         assert 80.0 < grid.uncertainty_km(grid.place("DN13")) < 120.0
         # More characters, less slack — and sharply less.
         assert grid.uncertainty_km(grid.place("DN13la")) < 10.0
@@ -523,7 +529,7 @@ class TestOnAirPrecision:
         """MET-091: 2128 km is within 207 km of the 2300 km single-hop limit.
 
         Reporting that as a settled "workable" would make the tool look more
-        certain than the two grid squares it was given.
+        certain than the two 4-character grid squares it was given.
         """
         answer = server.meteor_window(my_grid="DN13", their_grid="EM12",
                                       shower="PER", when="2026-08-12T09:00Z", hours=0)

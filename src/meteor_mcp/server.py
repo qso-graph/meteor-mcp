@@ -355,13 +355,14 @@ def _precision_note(distance_km: float, slack: float,
                     here: dict[str, Any], there: dict[str, Any]) -> str | None:
     """Say so when the locators are too coarse to decide the single-hop call.
 
-    Four characters is what goes over the air — the FT8 and MSK144 structured
-    message payload carries a 4-character grid, and 6 or 8 only reach a log. So
-    both ends of a meteor path are normally known to about 100 km each, and a
-    path length computed from two square centres carries around 200 km of
-    slack. That is small against a 1500 km path and decisive against a
-    threshold: a path reported as 2250 km could be anywhere from roughly 2050
-    to 2450, which straddles the 2300 km single-hop limit.
+    A locator may arrive with 4, 6 or 8 characters: operators commonly state 6
+    or 8 for their own station, while a standard WSJT-X exchange is usually 4.
+    This does not assume which — the slack is computed from the characters each
+    locator actually carried. But 4 is the floor worth planning around, and
+    there two square centres put the path length within about 200 km. That is
+    small against a 1500 km path and decisive against a threshold: a path
+    reported as 2250 km could be anywhere from roughly 2050 to 2450, which
+    straddles the 2300 km single-hop limit.
 
     Reporting the distance as though it were exact would make the tool look
     more certain than the data it was given. So when a limit falls inside the
@@ -382,9 +383,8 @@ def _precision_note(distance_km: float, slack: float,
                 f"limit of {limit:.0f} km, and {how} — a grid square is a rectangle, so "
                 f"the true distance could be roughly {distance_km - slack:.0f} to "
                 f"{distance_km + slack:.0f} km. Whether this path is inside single hop "
-                "cannot be decided at the precision a 4-character grid carries, which is "
-                "all that goes over the air. Exchange 6-character locators or exact "
-                "positions to settle it."
+                "cannot be decided at that precision. Exchange 6-character locators or "
+                "exact positions to settle it."
             )
     return None
 

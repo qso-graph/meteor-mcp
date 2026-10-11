@@ -111,11 +111,16 @@ def uncertainty_km(place: Place) -> float:
     anywhere in that rectangle is consistent with the locator it sent. The
     worst case is a corner, which is what this gives.
 
-    This is not a rounding error to be ignored. Four characters is what goes
-    over the air: the FT8 and MSK144 structured message payload carries a
-    4-character grid, and 6 or 8 characters only ever reach a log. So the far
-    end of a meteor-scatter path is normally known to about 100 km, and any
-    answer that depends on a distance threshold has to say so.
+    This is not a rounding error to be ignored. Operators commonly state 6 or
+    8 characters as their station's locator, and the standard WSJT-X exchange
+    is usually 4 — so the precision actually available varies, and 4 is the
+    safe floor to assume when nothing says otherwise. At 4 characters an end is
+    known to about 100 km.
+
+    Nothing here assumes which it is. The slack is computed from the characters
+    the locator actually carried, so a 6-character locator reports a few km and
+    a 4-character one reports about a hundred. Any answer resting on a distance
+    threshold then has to say which side of it the slack falls.
     """
     half_height = place.height_deg / 2.0 * KM_PER_DEGREE
     half_width = (place.width_deg / 2.0 * KM_PER_DEGREE
