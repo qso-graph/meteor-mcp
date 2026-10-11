@@ -71,6 +71,42 @@ Two tools read the network, because only those two report what is happening righ
 
 Everything else is computed locally and needs no network at all.
 
+## Your own end comes from your station profile
+
+`meteor_window` needs both ends of the path, but you should not have to retype your own.
+Your end is optional, and a host that knows the operator's station supplies it — in QG
+Desktop that is the **Station** component.
+
+The fields are **ADIF's**, not invented here:
+
+| ADIF field | Used for |
+|------------|----------|
+| `MY_GRIDSQUARE` | The default grid. ADIF permits 2, 4, 6 or 8 characters |
+| `MY_GRIDSQUARE_EXT` | Characters 9–12 of a 10- or 12-character locator |
+| `MY_LAT` / `MY_LON` | The exact position, **preferred over a grid square** |
+
+A grid square is a rectangle, and without coordinates this has to take its centre — about
+110 by 160 km of slack for a 4-character locator, which moved one real path by 38 km in
+testing. So when `MY_LAT` and `MY_LON` are known they win, and the answer says which it
+used.
+
+A 2-character `MY_GRIDSQUARE` is a legitimate ADIF value but is refused for a path: a
+Maidenhead field is 10 by 20 degrees, around 1100 km across, which is wider than the
+entire usable meteor-scatter range. The refusal explains the precision rather than calling
+the locator invalid, because it isn't.
+
+### Home, portable, and remote all work the same way
+
+ADIF's location fields describe the **transmitting station**, not where the operator is
+sitting — `MY_LAT` is *"the logging station's latitude"*. That is what makes a remote
+operation come out right without a special case: the reflection geometry depends on where
+the antenna is. ADIF separates the three callsigns for exactly this reason —
+`STATION_CALLSIGN` (used over the air), `OPERATOR` (the person), and `OWNER_CALLSIGN`
+(*"the callsign of the OPERATOR's host"*).
+
+So operating a remote station in FN42 from a chair in DN13 gives the FN42 path, and the
+operator's own location never enters the calculation.
+
 ## Install
 
 ```bash

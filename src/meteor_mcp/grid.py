@@ -17,11 +17,14 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-# Two letters, two digits, then optionally two more letters. Longer locators
-# exist (10 and 12 characters); they are accepted and read to the precision
-# this understands rather than refused, because a station that sends one is not
-# wrong, it is just more precise than EME needs.
-_LOCATOR = re.compile(r"^[A-R]{2}[0-9]{2}([A-X]{2}([0-9]{2})?)?$", re.IGNORECASE)
+# ADIF's MY_GRIDSQUARE permits 2, 4, 6 or 8 characters, with 10 and 12
+# character locators split across MY_GRIDSQUARE and MY_GRIDSQUARE_EXT. All of
+# those are read here, to the precision each actually carries — a station that
+# sends a longer locator is not wrong, just more precise than this needs, and
+# one that sends a 2-character field is not wrong either, only very coarse.
+# Whether a given precision is good enough is the caller's judgement, not this
+# module's, so `Place` reports it rather than this refusing it.
+_LOCATOR = re.compile(r"^[A-R]{2}([0-9]{2}([A-X]{2}([0-9]{2})?)?)?$", re.IGNORECASE)
 
 
 class GridError(ValueError):
@@ -30,10 +33,18 @@ class GridError(ValueError):
 
 @dataclass(frozen=True)
 class Place:
-    """Where a locator puts you: the centre of its square."""
+    """Where a locator puts you: the centre of its square.
+
+    `precision_chars` is how many characters the locator carried, because how
+    coarse it is decides what it can be used for. A 2-character field is 10 by
+    20 degrees — around 1100 km across, wider than the whole usable
+    meteor-scatter path range — so a caller computing a path has to be able to
+    tell that apart from a 4-character square.
+    """
     locator: str
     latitude: float
     longitude: float
+    precision_chars: int = 4
 
 
 def valid_locator(locator: str) -> bool:
@@ -50,14 +61,20 @@ def place(locator: str) -> Place:
     text = str(locator).strip().upper()
     if not _LOCATOR.match(text):
         raise GridError(
-            f"{locator!r} is not a Maidenhead locator. "
-            "Expected two letters, two digits, and optionally two more letters "
-            "(for example DN13 or DN13la)."
+            f"{locator!r} is not a Maidenhead locator. Expected two letters, "
+            "then optionally two digits, two more letters and two more digits "
+            "(for example DN, DN13, DN13la or DN13la12)."
         )
 
     # Field: 20 degrees of longitude, 10 of latitude.
     longitude = (ord(text[0]) - ord("A")) * 20.0 - 180.0
     latitude = (ord(text[1]) - ord("A")) * 10.0 - 90.0
+
+    if len(text) == 2:
+        # A bare field, which ADIF permits. Nothing further to add, and the
+        # centre of a 10-by-20-degree box is all it can honestly give.
+        return Place(text, latitude + 5.0, longitude + 10.0, 2)
+
     # Square: 2 degrees of longitude, 1 of latitude.
     longitude += int(text[2]) * 2.0
     latitude += int(text[3]) * 1.0
@@ -76,4 +93,5 @@ def place(locator: str) -> Place:
         size_lon, size_lat = 2.0, 1.0
 
     # The centre of the square, not its south-west corner.
-    return Place(text, latitude + size_lat / 2.0, longitude + size_lon / 2.0)
+    return Place(text, latitude + size_lat / 2.0, longitude + size_lon / 2.0,
+                 len(text))

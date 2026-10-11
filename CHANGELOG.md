@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a reflection is geometrically possible at all — a trail reflects only where it is
   tangent to the ellipsoid with both stations at its foci, so a radiant broadside to the
   path works and one up-path does not, at the same elevation.
+- **Your own end of the path comes from the station profile.** `meteor_window` takes
+  `their_grid` and leaves `my_grid` optional, so a host that knows the operator's station
+  supplies it — QG Desktop's Station component, carrying **ADIF's `MY_GRIDSQUARE`**. Exact
+  `MY_LAT`/`MY_LON` coordinates are accepted and preferred over a grid square, because a
+  square is a rectangle whose centre would otherwise be assumed (about 110 by 160 km of
+  slack at 4 characters; it moved one real path by 38 km). Home, portable and remote all
+  work without a special case, because ADIF's location fields describe the transmitting
+  station rather than where the operator sits. A 2-character locator is refused for a path
+  with the reason, since ADIF permits it but 1100 km of ambiguity cannot support one.
 - **`meteor_showers`** — which showers are near their published maximum, closest first.
 - **`meteor_shower_info`** — every published solution for one shower, never blended.
 - **`meteor_activity`** — confirmed meteor counts today from the Global Meteor Network,
@@ -34,6 +43,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notes
 
+- **The summary leads with the path verdict when the path cannot work.** Distance and
+  radiant geometry are assessed independently, so a path far past single hop can still
+  have a radiant beautifully placed — and the sentence opened with "workable for 7 of 7
+  sampled times" on a 2535 km path that is physically unusable, mentioning the distance
+  only at the end. An operator reading the first clause would have gone and listened.
 - **The verdict is words, not a score.** The physics is a tangency condition and what a
   station hears also depends on its power, antenna and the sporadic background. A number
   out of a hundred would imply a precision none of that supports, so each verdict carries

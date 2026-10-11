@@ -13,7 +13,7 @@ from datetime import datetime
 
 import pytest
 
-from meteor_mcp import live, server, showers
+from meteor_mcp import grid, live, server, showers
 
 
 class TestShowerCatalogue:
@@ -96,17 +96,32 @@ class TestShowersNearPeak:
 class TestWindow:
     def test_it_reports_the_path_the_shower_and_the_hours(self) -> None:
         """MET-040: the three things the question is actually about."""
-        answer = server.meteor_window("DN13", "EM12", hours=6, step_minutes=60)
+        answer = server.meteor_window(my_grid="DN13", their_grid="EM12", hours=6, step_minutes=60)
         assert answer["path"]["distance_km"] > 0
         assert {"time_utc", "radiant_elevation_deg", "offset_from_path_deg",
                 "verdict", "why"} <= set(answer["rows"][0])
         assert len(answer["rows"]) == 7
         assert answer["shower"]["code"]
 
-    def test_both_ends_matter_so_both_are_required(self) -> None:
-        """MET-041: meteor scatter is point to point; one grid is not a path."""
-        with pytest.raises(TypeError):
-            server.meteor_window("DN13")  # type: ignore[call-arg]
+    def test_your_own_end_may_come_from_the_station_profile(self) -> None:
+        """MET-041: one grid is not a path, and the error says where the other
+        end is meant to come from.
+
+        Meteor scatter is point to point, so both ends are required — but the
+        operator's own end is not something they should have to retype. QG
+        Desktop's Station component carries it, as ADIF's MY_GRIDSQUARE. When
+        the host has not supplied it, the refusal has to name that, or the
+        caller has no way to know what is missing.
+        """
+        answer = server.meteor_window(their_grid="EM12")
+        assert "error" in answer
+        assert "MY_GRIDSQUARE" in answer["error"]
+        assert "Station" in answer["error"]
+
+        # The far end is the caller's to give, and its absence reads differently.
+        other = server.meteor_window(my_grid="DN13")
+        assert "error" in other
+        assert "other station" in other["error"]
 
     def test_the_midpoint_decides_not_either_station(self) -> None:
         """MET-042: the reflection happens in the middle, so that is the sky used.
@@ -114,23 +129,23 @@ class TestWindow:
         Two very different paths from the same station must not produce the
         same radiant elevation, or the midpoint is being ignored.
         """
-        east = server.meteor_window("DN13", "FN42", shower="PER",
+        east = server.meteor_window(my_grid="DN13", their_grid="FN42", shower="PER",
                                     when="2026-08-12T08:00Z", hours=0)
-        south = server.meteor_window("DN13", "DM03", shower="PER",
+        south = server.meteor_window(my_grid="DN13", their_grid="DM03", shower="PER",
                                      when="2026-08-12T08:00Z", hours=0)
         assert east["rows"][0]["radiant_elevation_deg"] != \
             south["rows"][0]["radiant_elevation_deg"]
 
     def test_a_path_too_short_for_the_mode_is_said_so(self) -> None:
         """MET-043: 100 km is a tropo path, and pretending otherwise wastes a night."""
-        answer = server.meteor_window("DN13", "DN14", shower="PER", hours=0)
+        answer = server.meteor_window(my_grid="DN13", their_grid="DN14", shower="PER", hours=0)
         assert answer["path"]["workable_distance"] is False
         assert "short" in answer["path"]["single_hop_note"]
         assert "short" in answer["summary"]
 
     def test_a_path_too_long_is_also_said_so(self) -> None:
         """MET-044: past single hop the trail is below both horizons."""
-        answer = server.meteor_window("DN13", "IO91", shower="PER", hours=0)
+        answer = server.meteor_window(my_grid="DN13", their_grid="IO91", shower="PER", hours=0)
         assert answer["path"]["workable_distance"] is False
         assert "beyond" in answer["path"]["single_hop_note"]
 
@@ -140,42 +155,42 @@ class TestWindow:
         Anchoring the peak search to the calendar year reported that maximum as
         ten months past while the offset beside it said four days ahead.
         """
-        answer = server.meteor_window("DN13", "EM12", shower="QUA",
+        answer = server.meteor_window(my_grid="DN13", their_grid="EM12", shower="QUA",
                                       when="2026-12-30T04:00Z", hours=0)
         assert answer["shower"]["peak_utc"].startswith("2027-01")
         assert 3.0 < answer["shower"]["days_until_peak"] < 6.0
 
     def test_no_shower_named_means_the_one_nearest_its_peak(self) -> None:
         """MET-046: and the answer says that is what happened."""
-        answer = server.meteor_window("DN13", "EM12", hours=0)
+        answer = server.meteor_window(my_grid="DN13", their_grid="EM12", hours=0)
         assert "nearest" in answer["shower"]["chosen"]
-        named = server.meteor_window("DN13", "EM12", shower="PER", hours=0)
+        named = server.meteor_window(my_grid="DN13", their_grid="EM12", shower="PER", hours=0)
         assert named["shower"]["code"] == "PER"
         assert named["shower"]["chosen"] == "as asked"
 
     def test_a_bad_locator_is_refused_not_approximated(self) -> None:
         """MET-047: a mis-read locator points at the wrong sky."""
         for bad in ("", "DN", "ZZ99", "1313", "../etc", "DN13l"):
-            assert "error" in server.meteor_window(bad, "EM12"), bad
-            assert "error" in server.meteor_window("DN13", bad), bad
+            assert "error" in server.meteor_window(my_grid=bad, their_grid="EM12"), bad
+            assert "error" in server.meteor_window(my_grid="DN13", their_grid=bad), bad
 
     def test_a_bad_time_or_shower_is_refused(self) -> None:
         """MET-048: both inputs that could be silently wrong."""
-        assert "error" in server.meteor_window("DN13", "EM12", when="whenever")
-        assert "error" in server.meteor_window("DN13", "EM12", shower="Hyades")
+        assert "error" in server.meteor_window(my_grid="DN13", their_grid="EM12", when="whenever")
+        assert "error" in server.meteor_window(my_grid="DN13", their_grid="EM12", shower="Hyades")
 
     def test_a_huge_request_is_clamped(self) -> None:
         """MET-049: one call must not be able to compute for ever."""
-        answer = server.meteor_window("DN13", "EM12", hours=99_999, step_minutes=60)
+        answer = server.meteor_window(my_grid="DN13", their_grid="EM12", hours=99_999, step_minutes=60)
         assert answer["hours"] <= server.MAX_HOURS
         assert len(answer["rows"]) <= server.MAX_ROWS
-        fine = server.meteor_window("DN13", "EM12", hours=48, step_minutes=0.001)
+        fine = server.meteor_window(my_grid="DN13", their_grid="EM12", hours=48, step_minutes=0.001)
         assert len(fine["rows"]) <= server.MAX_ROWS
 
     def test_nulls_are_treated_as_defaults(self) -> None:
         """MET-050: llama.cpp and mcpo send null for optional parameters."""
         assert "error" not in server.meteor_window(
-            "DN13", "EM12", shower=None, when=None, hours=None, step_minutes=None)
+            my_grid="DN13", their_grid="EM12", shower=None, when=None, hours=None, step_minutes=None)
         assert "error" not in server.meteor_showers(when=None, limit=None)
 
     def test_the_verdict_is_words_with_a_reason_not_a_score(self) -> None:
@@ -184,7 +199,7 @@ class TestWindow:
         A number out of a hundred would imply a precision the physics does not
         support, so the shape of the answer is part of the product.
         """
-        answer = server.meteor_window("DN13", "EM12", shower="PER",
+        answer = server.meteor_window(my_grid="DN13", their_grid="EM12", shower="PER",
                                       when="2026-08-12T06:00Z", hours=12, step_minutes=60)
         assert all(row["verdict"] in ("no", "marginal", "good", "best")
                    for row in answer["rows"])
@@ -201,13 +216,62 @@ class TestWindow:
         elevation alone.
         """
         when = "2026-08-12T09:00Z"
-        broadside = server.meteor_window("DN13", "EM12", shower="PER", when=when, hours=0)
-        along = server.meteor_window("DN13", "DM03", shower="PER", when=when, hours=0)
+        broadside = server.meteor_window(my_grid="DN13", their_grid="EM12", shower="PER", when=when, hours=0)
+        along = server.meteor_window(my_grid="DN13", their_grid="DM03", shower="PER", when=when, hours=0)
         rank = {"no": 0, "marginal": 1, "good": 2, "best": 3}
         assert broadside["rows"][0]["offset_from_path_deg"] > \
             along["rows"][0]["offset_from_path_deg"]
         assert rank[broadside["rows"][0]["verdict"]] > rank[along["rows"][0]["verdict"]]
 
+
+    def test_exact_coordinates_are_used_in_preference_to_a_grid_square(self) -> None:
+        """MET-053: better data wins.
+
+        ADIF carries both for a station: MY_GRIDSQUARE and MY_LAT/MY_LON. A
+        4-character square is about 110 by 160 km and this would otherwise have
+        to assume its centre, so when the exact position is known there is no
+        reason to round it into the middle of a box. The distance must change
+        when real coordinates are supplied for the same square.
+        """
+        centre = server.meteor_window(my_grid="DN13", their_grid="EM12", hours=0)
+        # A real position inside DN13, well away from the square's centre.
+        exact = server.meteor_window(my_lat=43.95, my_lon=-116.1,
+                                     their_grid="EM12", hours=0)
+        assert exact["path"]["from"]["from"] == "coordinates"
+        assert centre["path"]["from"]["from"] == "grid square centre"
+        assert exact["path"]["distance_km"] != centre["path"]["distance_km"]
+
+    def test_the_answer_says_how_precisely_each_end_was_located(self) -> None:
+        """MET-054: a 4-character grid is not a point, and should not look like one."""
+        answer = server.meteor_window(my_grid="DN13", their_grid="EM12la", hours=0)
+        assert answer["path"]["from"]["precision_chars"] == 4
+        assert answer["path"]["to"]["precision_chars"] == 6
+
+    def test_a_two_character_field_is_refused_for_a_path(self) -> None:
+        """MET-055: ADIF permits it; the geometry cannot use it.
+
+        A Maidenhead field is 10 by 20 degrees, around 1100 km across — wider
+        than the entire usable meteor-scatter range. It is a legitimate
+        MY_GRIDSQUARE value, so the refusal explains the precision rather than
+        calling it invalid, which would be wrong and unhelpful.
+        """
+        answer = server.meteor_window(my_grid="DN", their_grid="EM12")
+        assert "error" in answer
+        assert "2 characters" in answer["error"]
+        assert "1100 km" in answer["error"]
+        # It is still a readable locator; this is a precision judgement.
+        assert grid.place("DN").precision_chars == 2
+
+    def test_half_a_coordinate_pair_is_refused(self) -> None:
+        """MET-056: a latitude with no longitude is a mistake, not a default."""
+        assert "error" in server.meteor_window(my_lat=43.5, their_grid="EM12")
+        assert "error" in server.meteor_window(my_lon=-117.0, their_grid="EM12")
+
+    def test_a_position_off_the_earth_is_refused(self) -> None:
+        """MET-057: swapped latitude and longitude is the common form of this."""
+        for lat, lon in ((91.0, 0.0), (-91.0, 0.0), (0.0, 181.0), (-117.0, 43.5)):
+            answer = server.meteor_window(my_lat=lat, my_lon=lon, their_grid="EM12")
+            assert "error" in answer, (lat, lon)
 
 class TestAttribution:
     def test_every_answer_using_a_radiant_cites_the_owner(self) -> None:
@@ -216,7 +280,7 @@ class TestAttribution:
         A citation in the README does not travel with the answer, and the
         answer is what a user sees.
         """
-        for answer in (server.meteor_window("DN13", "EM12", hours=0),
+        for answer in (server.meteor_window(my_grid="DN13", their_grid="EM12", hours=0),
                        server.meteor_showers(limit=1),
                        server.meteor_shower_info("PER")):
             citation = answer.get("radiant_source") or answer.get("source")
@@ -254,7 +318,7 @@ class TestLiveSources:
             raise AssertionError("a computed tool opened a network connection")
 
         monkeypatch.setattr(urllib.request, "urlopen", refuse)
-        assert "error" not in server.meteor_window("DN13", "EM12", hours=2)
+        assert "error" not in server.meteor_window(my_grid="DN13", their_grid="EM12", hours=2)
         assert "error" not in server.meteor_showers(limit=5)
         assert "error" not in server.meteor_shower_info("PER")
         assert server.meteor_source_info()["carried_showers"] == 113
@@ -403,3 +467,36 @@ class TestRegistration:
 
         for tool in asyncio.run(server.mcp.list_tools()):
             assert tool.description and len(tool.description) > 40, tool.name
+
+
+class TestTheSummaryLeadsWithWhatMatters:
+    """The first clause is what gets read, so it has to be the deciding fact."""
+
+    def test_an_unusable_path_is_not_announced_as_workable(self) -> None:
+        """MET-058: radiant geometry must not bury the path verdict.
+
+        Distance and radiant geometry are assessed independently, so a path far
+        past single hop can still have a radiant beautifully placed. The
+        summary used to open with "Workable for 7 of 7 sampled times" on a
+        2535 km path that cannot work at all, mentioning the distance only at
+        the very end. An operator reading the first clause would have gone and
+        listened to noise.
+        """
+        answer = server.meteor_window(my_grid="FN42", their_grid="EM12",
+                                      shower="PER", when="2026-08-12T09:00Z",
+                                      hours=6, step_minutes=60)
+        assert answer["path"]["workable_distance"] is False
+        # There are good rows: this is not vacuous, the path verdict really is
+        # overriding genuinely favourable radiant geometry.
+        assert any(row["verdict"] in ("good", "best") for row in answer["rows"])
+        assert not answer["summary"].startswith("Workable")
+        assert "beyond single-hop" in answer["summary"]
+        assert "cannot work each other" in answer["summary"]
+
+    def test_a_usable_path_still_leads_with_the_times(self) -> None:
+        """MET-059: and the fix did not make every answer pessimistic."""
+        answer = server.meteor_window(my_grid="DN13", their_grid="EM12",
+                                      shower="PER", when="2026-08-12T06:00Z",
+                                      hours=12, step_minutes=60)
+        assert answer["path"]["workable_distance"] is True
+        assert answer["summary"].startswith("Workable")

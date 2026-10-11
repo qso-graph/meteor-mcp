@@ -48,6 +48,73 @@ MAX_ROWS = 2000
 MIN_STEP_MINUTES = 1.0
 
 
+# A locator coarser than this cannot support a path calculation. ADIF permits a
+# 2-character MY_GRIDSQUARE, and it is a legitimate value — but a field is 10 by
+# 20 degrees, roughly 1100 km across, which is wider than the entire usable
+# meteor-scatter range. A path computed from one would be fiction.
+MIN_LOCATOR_CHARS = 4
+
+
+class EndpointError(ValueError):
+    """One end of the path could not be located. The message is safe to show."""
+
+
+def _endpoint(locator: str | None, latitude: float | None, longitude: float | None,
+              role: str) -> tuple[float, float, dict[str, Any]]:
+    """Locate one end of the path, from a locator or from coordinates.
+
+    Coordinates win when given, because they are better data. ADIF carries
+    both for a station — `MY_GRIDSQUARE` and `MY_LAT`/`MY_LON` — and a grid
+    square is a rectangle whose centre this would otherwise have to assume. A
+    4-character square is about 110 by 160 km, so when a station knows its
+    actual position there is no reason to round it to the middle of a box.
+    """
+    if latitude is not None and longitude is not None:
+        try:
+            lat, lon = float(latitude), float(longitude)
+        except (TypeError, ValueError):
+            raise EndpointError(f"{role} latitude and longitude must be numbers.") from None
+        if not -90.0 <= lat <= 90.0 or not -180.0 <= lon <= 180.0:
+            raise EndpointError(
+                f"{role} position {lat}, {lon} is off the Earth: latitude runs "
+                "-90 to 90 and longitude -180 to 180.")
+        return lat, lon, {"latitude": round(lat, 4), "longitude": round(lon, 4),
+                          "from": "coordinates"}
+
+    if latitude is not None or longitude is not None:
+        raise EndpointError(f"{role} needs both a latitude and a longitude, or neither.")
+
+    if not locator:
+        raise EndpointError(
+            f"I do not have {role} location. Give a grid square, or a latitude "
+            "and longitude."
+            if role != "your own"
+            else "I do not have your own location. Give my_grid, or my_lat and "
+                 "my_lon, or set a default grid in your Station profile — that is "
+                 "ADIF's MY_GRIDSQUARE, and it travels with whether you are at "
+                 "home, portable, or operating a remote station.")
+
+    try:
+        place = grid.place(str(locator))
+    except grid.GridError as error:
+        raise EndpointError(str(error)) from None
+
+    if place.precision_chars < MIN_LOCATOR_CHARS:
+        raise EndpointError(
+            f"{str(locator).upper()!r} is only {place.precision_chars} characters — a "
+            "Maidenhead field about 1100 km across, which is wider than the whole "
+            "usable meteor-scatter path range. A path cannot honestly be computed "
+            "from it. Four characters or more, for example DN13.")
+
+    return place.latitude, place.longitude, {
+        "grid": place.locator,
+        "precision_chars": place.precision_chars,
+        "latitude": round(place.latitude, 4),
+        "longitude": round(place.longitude, 4),
+        "from": "grid square centre",
+    }
+
+
 def _err(message: str) -> dict[str, Any]:
     return {"error": message}
 
@@ -147,8 +214,12 @@ def _nearest_peak(moment: datetime) -> showers.Shower | None:
 
 @mcp.tool()
 def meteor_window(
-    my_grid: str,
-    their_grid: str,
+    their_grid: str | None = None,
+    my_grid: str | None = None,
+    their_lat: float | None = None,
+    their_lon: float | None = None,
+    my_lat: float | None = None,
+    my_lon: float | None = None,
     shower: str | None = None,
     when: str | None = None,
     hours: float | None = 12.0,
@@ -170,9 +241,20 @@ def meteor_window(
     broadside to the path works and one up- or down-path does not, at the very
     same elevation.
 
+    Your own end can be left out when the host supplies it from the operator's
+    station profile — ADIF's `MY_GRIDSQUARE`, or `MY_LAT` and `MY_LON` when the
+    exact position is known. Those fields describe the **transmitting station**,
+    not where the operator is sitting, which is what makes a remote operation
+    come out right: the reflection geometry depends on where the antenna is.
+
     Args:
-        my_grid: Your Maidenhead locator, e.g. "DN13" or "DN13la".
-        their_grid: The other station's locator.
+        their_grid: The other station's Maidenhead locator, e.g. "EM12".
+        my_grid: Your locator. Omitted, it must come from your station profile.
+        their_lat: The other station's latitude, if known exactly.
+        their_lon: The other station's longitude.
+        my_lat: Your latitude, if known exactly — preferred over a grid square,
+            which is a rectangle this would otherwise have to take the centre of.
+        my_lon: Your longitude.
         shower: Shower code, IAU number or name. Omitted, the one nearest its
             published peak is used and named in the answer.
         when: UTC start, ISO 8601. Omitted, now.
@@ -184,9 +266,10 @@ def meteor_window(
         return _err(f"'{when}' is not a time I can read. Use ISO 8601, e.g. 2026-08-12T02:00Z.")
 
     try:
-        here = grid.place(str(my_grid))
-        there = grid.place(str(their_grid))
-    except grid.GridError as error:
+        here_lat, here_lon, here_where = _endpoint(my_grid, my_lat, my_lon, "your own")
+        there_lat, there_lon, there_where = _endpoint(
+            their_grid, their_lat, their_lon, "the other station's")
+    except EndpointError as error:
         return _err(str(error))
 
     span = min(max(float(hours if hours is not None else 12.0), 0.0), MAX_HOURS)
@@ -205,9 +288,8 @@ def meteor_window(
         picked_how = "nearest its published peak; none was named"
 
     distance_km, bearing = geometry.great_circle(
-        here.latitude, here.longitude, there.latitude, there.longitude)
-    mid_lat, mid_lon = geometry.midpoint(
-        here.latitude, here.longitude, there.latitude, there.longitude)
+        here_lat, here_lon, there_lat, there_lon)
+    mid_lat, mid_lon = geometry.midpoint(here_lat, here_lon, there_lat, there_lon)
 
     rows: list[dict[str, Any]] = []
     steps = min(int(span * 60.0 / step) + 1, MAX_ROWS)
@@ -231,13 +313,14 @@ def meteor_window(
     note = geometry.path_note(distance_km)
     offset = _days_until_peak(chosen, moment)
 
-    summary = _summarise(rows, workable, note, chosen, offset)
+    distance_ok = geometry.MIN_PATH_KM <= distance_km <= geometry.MAX_PATH_KM
+    summary = _summarise(rows, workable, note, chosen, offset, distance_ok)
 
     return {
         "summary": summary,
         "path": {
-            "from": str(my_grid).upper(),
-            "to": str(their_grid).upper(),
+            "from": here_where,
+            "to": there_where,
             "distance_km": round(distance_km, 1),
             "bearing_deg": round(bearing, 1),
             "reverse_bearing_deg": round((bearing + 180.0) % 360.0, 1),
@@ -262,8 +345,17 @@ def meteor_window(
 
 
 def _summarise(rows: list[dict[str, Any]], workable: list[dict[str, Any]],
-               note: str | None, shower: showers.Shower, offset: float | None) -> str:
-    """One plain sentence an operator can act on."""
+               note: str | None, shower: showers.Shower, offset: float | None,
+               distance_ok: bool) -> str:
+    """One plain sentence an operator can act on.
+
+    The path verdict comes first when the path cannot work. Radiant geometry is
+    assessed independently of distance, so a path well past single hop can
+    still have a radiant beautifully placed — and this sentence used to open
+    with "workable for 7 of 7 sampled times" on a 2535 km path that is
+    physically unusable, burying the only fact that mattered at the end. An
+    operator reading the first clause would have gone and listened.
+    """
     if not rows:
         return "No time span was asked for."
     if offset is None:
@@ -274,6 +366,11 @@ def _summarise(rows: list[dict[str, Any]], workable: list[dict[str, Any]],
         when_text = f"{shower.name} peaks in {offset:.0f} days"
     else:
         when_text = f"{shower.name} peaked {abs(offset):.0f} days ago"
+    if not distance_ok:
+        # The radiant can be perfectly placed and it will still not matter.
+        return (f"{note} The radiant's position does not change that, so this "
+                f"pair cannot work each other by single-hop meteor scatter. "
+                f"{when_text}.")
     if note and not workable:
         return f"{note} {when_text}."
     if not workable:
