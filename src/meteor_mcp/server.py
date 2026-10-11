@@ -355,11 +355,16 @@ def _precision_note(distance_km: float, slack: float,
                     here: dict[str, Any], there: dict[str, Any]) -> str | None:
     """Say so when the locators are too coarse to decide the single-hop call.
 
-    A locator may arrive with 4, 6 or 8 characters: operators commonly state 6
-    or 8 for their own station, while a standard WSJT-X exchange is usually 4.
-    This does not assume which — the slack is computed from the characters each
-    locator actually carried. But 4 is the floor worth planning around, and
-    there two square centres put the path length within about 200 km. That is
+    A locator may arrive with 4, 6 or 8 characters. Operators commonly state 6
+    or 8 for their own station, and the open modes — RTTY, PSK, CW, SSB — put
+    no limit on what can be sent. The fixed-length modes are the constraint:
+    WSPR, FT8, FT4 and MSK144 pack a message of fixed size, so four characters
+    is what fits. Meteor work is mostly MSK144, which makes 4 the floor worth
+    planning around here.
+
+    This does not assume which arrives — the slack is computed from the
+    characters each locator actually carried. But at that floor two square
+    centres put the path length within about 200 km. That is
     small against a 1500 km path and decisive against a threshold: a path
     reported as 2250 km could be anywhere from roughly 2050 to 2450, which
     straddles the 2300 km single-hop limit.
@@ -383,8 +388,10 @@ def _precision_note(distance_km: float, slack: float,
                 f"limit of {limit:.0f} km, and {how} — a grid square is a rectangle, so "
                 f"the true distance could be roughly {distance_km - slack:.0f} to "
                 f"{distance_km + slack:.0f} km. Whether this path is inside single hop "
-                "cannot be decided at that precision. Exchange 6-character locators or "
-                "exact positions to settle it."
+                "cannot be decided at that precision. A 6-character locator or an exact "
+                "position for either end would settle it — but get it from a sked page, "
+                "QRZ or the operator directly rather than expecting it on the air, since "
+                "the fixed-length modes used for meteor work carry only four characters."
             )
     return None
 
