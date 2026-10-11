@@ -1,0 +1,63 @@
+[project]
+name = "meteor-mcp"
+version = "0.0.1"
+description = "Meteor scatter MCP server — in development"
+readme = "README.md"
+license = {text = "GPL-3.0-or-later"}
+authors = [{name = "Greg Beam, KI7MT", email = "maintainers@qso-graph.io"}]
+requires-python = ">=3.10"
+dependencies = [
+    "fastmcp>=4.0,<5",
+]
+keywords = ["amateur-radio", "ham-radio", "qso-graph", "mcp", "model-context-protocol"]
+classifiers = [
+    "Development Status :: 1 - Planning",
+    "Intended Audience :: Developers",
+    "Topic :: Communications :: Ham Radio",
+    "License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://qso-graph.io"
+Repository = "https://github.com/qso-graph/meteor-mcp"
+Issues = "https://github.com/qso-graph/qso-graph-devel/issues/51"
+
+[project.scripts]
+meteor-mcp = "meteor_mcp.server:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/meteor_mcp"]
+
+[dependency-groups]
+dev = ["pytest>=8.0", "ruff>=0.6.8", "mypy>=1.11"]
+
+[tool.ruff]
+target-version = "py311"
+src = ["src", "tests"]
+line-length = 95
+extend-exclude = [".venv", "dist", "build"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
+fixable = ["I"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src"]
+strict = true
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

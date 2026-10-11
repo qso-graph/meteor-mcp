@@ -1,0 +1,26 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-07-09/server.schema.json",
+  "name": "io.github.qso-graph/meteor-mcp",
+  "description": "Meteor scatter MCP server: shower timing, radiant windows, live flux and fireballs",
+  "repository": {
+    "url": "https://github.com/qso-graph/meteor-mcp",
+    "source": "github"
+  },
+  "version": "0.0.1",
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "meteor-mcp",
+      "version": "0.0.1",
+      "transport": {
+        "type": "stdio"
+      }
+    }
+  ],
+  "_meta": {
+    "io.modelcontextprotocol.registry/publisher-provided": {
+      "tool": "manual",
+      "version": "2.0.0"
+    }
+  }
+}
