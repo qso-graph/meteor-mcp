@@ -1,0 +1,69 @@
+meteor-mcp
+Copyright (C) 2026 Greg Beam, KI7MT and the qso-graph contributors
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. See LICENSE.
+
+---
+
+SHOWER DATA
+
+The meteor shower facts this package carries are read from the IAU Meteor Data
+Center's list of established showers:
+
+  IAU Meteor Data Center (IAU Commission F1, Meteors, Meteorites and
+  Interplanetary Dust) — Established meteor showers, V.2.
+  https://www.ta3.sk/IAUC22DB/MDC2022/Etc/streamestablisheddata2026.txt
+
+The MDC database is maintained on an unpaid voluntary basis and asks to be
+cited. Its requested references are:
+
+  Jenniskens, P.; Jopek, T.J.; Janches, D.; Hajdukova, M.; Kokhirova,
+  G.I.; Rudawska, R.; 2020, Planetary and Space Science, Vol. 182, article
+  id. 104821
+
+  Jopek, T.J.; Kanuchova, Z.; 2017, Planetary and Space Science, Vol. 143,
+  p. 3-6
+
+  Jopek, T.J.; Kanuchova, Z.; 2014, in The Meteoroids 2013, Proceedings of
+  the Astronomical Conference, A.M. University Press, p. 353-364
+
+  Jopek, T.J.; Jenniskens, P.M.; 2011, in Meteoroids: The Smallest Solar
+  System Bodies, NASA/CP-2011-216469, p. 7-13
+
+The authors' names carry diacritics that are preserved exactly in
+src/meteor_mcp/data/SOURCE.json and in what meteor_source_info returns; they
+are transliterated here only because this file is plain ASCII.
+
+This package does not redistribute the MDC's file. It records the file's URL,
+retrieval date and SHA-256, and holds the facts read from it. The shower
+numbers, codes, names and radiants are the MDC's and are not claimed.
+
+---
+
+LIVE SOURCES
+
+  Global Meteor Network — https://globalmeteornetwork.org/
+  Licensed CC BY 4.0. Attribution is a condition of the licence and is
+  returned inside every answer that uses GMN data, not only here.
+
+  NASA/JPL Center for Near-Earth Object Studies (CNEOS) —
+  https://ssd-api.jpl.nasa.gov/fireball.api
+  US government work. Credited by courtesy in every answer that uses it.
+
+---
+
+ALGORITHMS
+
+The solar-longitude series and the calendar arithmetic are from:
+
+  Jean Meeus, "Astronomical Algorithms", 2nd edition, Willmann-Bell, 1998.
+  Chapters 7 (Julian Day) and 25 (the Sun's position).
+
+The implementation is ours and is covered by the licence above. The
+mathematics is Meeus's and is not claimed.
+
+The reflection geometry is standard meteor-scatter theory: a trail reflects
+specularly where it is tangent to the ellipsoid having both stations as foci.

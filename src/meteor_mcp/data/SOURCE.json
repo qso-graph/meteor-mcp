@@ -1,0 +1,41 @@
+{
+  "title": "Established meteor showers",
+  "schema": "meteor_showers",
+  "owner": "IAU Meteor Data Center (IAU Commission F1, Meteors, Meteorites and Interplanetary Dust)",
+  "document_title": "IAU Meteor Data Center — Established meteor showers, V.2",
+  "document": "streamestablisheddata2026.txt",
+  "edition": "2026, last updated Oct 09 2026 20:00 UTC",
+  "url": "https://www.ta3.sk/IAUC22DB/MDC2022/Etc/streamestablisheddata2026.txt",
+  "authority": "The IAU Meteor Data Center names and numbers meteor showers. A shower's IAU number, three-letter code, name, radiant and geocentric velocity are the MDC's facts, served here and credited to it.",
+  "terms": "The MDC database is maintained on an unpaid voluntary basis and asks to be cited. Its requested references are carried in `citations` below and are returned by meteor_source_info, printed in the README and recorded in NOTICE. This package does not redistribute the MDC's file: it records the file's URL and SHA-256 and holds the facts read from it.",
+  "citations": [
+    "Jenniskens, P.; Jopek, T.J.; Janches, D.; Hajduková, M.; Kokhirova, G.I.; Rudawska, R.; 2020, Planetary and Space Science, Vol. 182, article id. 104821",
+    "Jopek, T.J.; Kaňuchová, Z.; 2017, Planetary and Space Science, Vol. 143, p. 3-6",
+    "Jopek, T.J.; Kaňuchová, Z.; 2014, in The Meteoroids 2013, Proceedings of the Astronomical Conference, A.M. University Press, p. 353-364",
+    "Jopek, T.J.; Jenniskens, P.M.; 2011, in Meteoroids: The Smallest Solar System Bodies, NASA/CP-2011-216469, p. 7-13"
+  ],
+  "published": {
+    "streamestablisheddata2026.txt": {
+      "url": "https://www.ta3.sk/IAUC22DB/MDC2022/Etc/streamestablisheddata2026.txt",
+      "retrieved": "2026-10-11",
+      "sha256": "691f5b02803440bcea28bf313a3e4a7cdec1a66bb8711f37571c37ed0ce1df7c",
+      "encoding": "latin-1",
+      "note": "Read as latin-1. The authors' names carry diacritics that mangle on a naive read, and a credit someone asked for is worth spelling correctly."
+    }
+  },
+  "facts": [
+    "showers.json"
+  ],
+  "live_sources": {
+    "Global Meteor Network": {
+      "url": "https://globalmeteornetwork.org/",
+      "licence": "CC BY 4.0",
+      "note": "Attribution is a condition of the licence, so it is returned in the answer, not only in the README."
+    },
+    "NASA CNEOS": {
+      "url": "https://ssd-api.jpl.nasa.gov/fireball.api",
+      "licence": "US government work; no authentication required",
+      "note": "Credited by courtesy in every answer that uses it."
+    }
+  }
+}
