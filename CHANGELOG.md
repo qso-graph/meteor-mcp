@@ -43,6 +43,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notes
 
+- **The single-hop call is hedged when the locators cannot decide it.** Four characters is
+  what goes over the air — FT8 and MSK144 carry a 4-character grid in the structured
+  message payload, and 6 or 8 only reach a log — so with meteor scatter being MSK144, both
+  ends are normally known to about 100 km and the path length to about 200 km. Immaterial
+  mid-range, decisive against a threshold: 2250 km could be 2050 to 2450, straddling the
+  2300 km limit. When a limit falls inside the slack the answer says the call cannot be
+  made at that precision and what would settle it. The slack is always reported.
 - **The summary leads with the path verdict when the path cannot work.** Distance and
   radiant geometry are assessed independently, so a path far past single hop can still
   have a radiant beautifully placed — and the sentence opened with "workable for 7 of 7

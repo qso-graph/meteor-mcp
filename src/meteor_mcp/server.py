@@ -79,7 +79,7 @@ def _endpoint(locator: str | None, latitude: float | None, longitude: float | No
                 f"{role} position {lat}, {lon} is off the Earth: latitude runs "
                 "-90 to 90 and longitude -180 to 180.")
         return lat, lon, {"latitude": round(lat, 4), "longitude": round(lon, 4),
-                          "from": "coordinates"}
+                          "from": "coordinates", "uncertainty_km": 0.0}
 
     if latitude is not None or longitude is not None:
         raise EndpointError(f"{role} needs both a latitude and a longitude, or neither.")
@@ -112,6 +112,7 @@ def _endpoint(locator: str | None, latitude: float | None, longitude: float | No
         "latitude": round(place.latitude, 4),
         "longitude": round(place.longitude, 4),
         "from": "grid square centre",
+        "uncertainty_km": round(grid.uncertainty_km(place), 1),
     }
 
 
@@ -314,7 +315,11 @@ def meteor_window(
     offset = _days_until_peak(chosen, moment)
 
     distance_ok = geometry.MIN_PATH_KM <= distance_km <= geometry.MAX_PATH_KM
+    slack = float(here_where["uncertainty_km"]) + float(there_where["uncertainty_km"])
+    precision_note = _precision_note(distance_km, slack, here_where, there_where)
     summary = _summarise(rows, workable, note, chosen, offset, distance_ok)
+    if precision_note:
+        summary = f"{summary} {precision_note}"
 
     return {
         "summary": summary,
@@ -326,7 +331,9 @@ def meteor_window(
             "reverse_bearing_deg": round((bearing + 180.0) % 360.0, 1),
             "midpoint": {"latitude": round(mid_lat, 3), "longitude": round(mid_lon, 3)},
             "single_hop_note": note,
-            "workable_distance": geometry.MIN_PATH_KM <= distance_km <= geometry.MAX_PATH_KM,
+            "workable_distance": distance_ok,
+            "distance_uncertainty_km": round(slack, 1),
+            "precision_note": precision_note,
         },
         "shower": _shower_payload(chosen, moment) | {"chosen": picked_how},
         "best_times_utc": [row["time_utc"] for row in workable],
@@ -342,6 +349,44 @@ def meteor_window(
         ),
         "radiant_source": _citation(),
     }
+
+
+def _precision_note(distance_km: float, slack: float,
+                    here: dict[str, Any], there: dict[str, Any]) -> str | None:
+    """Say so when the locators are too coarse to decide the single-hop call.
+
+    Four characters is what goes over the air — the FT8 and MSK144 structured
+    message payload carries a 4-character grid, and 6 or 8 only reach a log. So
+    both ends of a meteor path are normally known to about 100 km each, and a
+    path length computed from two square centres carries around 200 km of
+    slack. That is small against a 1500 km path and decisive against a
+    threshold: a path reported as 2250 km could be anywhere from roughly 2050
+    to 2450, which straddles the 2300 km single-hop limit.
+
+    Reporting the distance as though it were exact would make the tool look
+    more certain than the data it was given. So when a limit falls inside the
+    slack, the answer says the call cannot be made at this precision and what
+    would settle it.
+    """
+    if slack <= 0.0:
+        return None
+    for limit, name in ((geometry.MIN_PATH_KM, "minimum"), (geometry.MAX_PATH_KM, "single-hop")):
+        if abs(distance_km - limit) < slack:
+            ends = []
+            for label, where in (("yours", here), ("theirs", there)):
+                if where.get("precision_chars"):
+                    ends.append(f"{label} {where['precision_chars']} characters")
+            how = " and ".join(ends) if ends else "the locators given"
+            return (
+                f"That {distance_km:.0f} km is within {slack:.0f} km of the {name} "
+                f"limit of {limit:.0f} km, and {how} — a grid square is a rectangle, so "
+                f"the true distance could be roughly {distance_km - slack:.0f} to "
+                f"{distance_km + slack:.0f} km. Whether this path is inside single hop "
+                "cannot be decided at the precision a 4-character grid carries, which is "
+                "all that goes over the air. Exchange 6-character locators or exact "
+                "positions to settle it."
+            )
+    return None
 
 
 def _summarise(rows: list[dict[str, Any]], workable: list[dict[str, Any]],

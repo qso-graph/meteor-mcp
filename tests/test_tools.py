@@ -500,3 +500,61 @@ class TestTheSummaryLeadsWithWhatMatters:
                                       hours=12, step_minutes=60)
         assert answer["path"]["workable_distance"] is True
         assert answer["summary"].startswith("Workable")
+
+
+class TestOnAirPrecision:
+    """Four characters is what goes over the air, so it is the normal case.
+
+    The FT8 and MSK144 structured message payload carries a 4-character grid;
+    6 and 8 characters only ever reach a log. Meteor scatter *is* MSK144, so
+    the far end of a path is normally known to about 100 km and the path
+    length to about 200 km. That is immaterial mid-range and decisive against
+    a threshold.
+    """
+
+    def test_a_four_character_grid_is_about_a_hundred_km_of_slack(self) -> None:
+        """MET-090: the quantity, so the note below is not arbitrary."""
+        assert 80.0 < grid.uncertainty_km(grid.place("DN13")) < 120.0
+        # More characters, less slack — and sharply less.
+        assert grid.uncertainty_km(grid.place("DN13la")) < 10.0
+        assert grid.uncertainty_km(grid.place("DN13la12")) < 1.0
+
+    def test_a_limit_inside_the_slack_is_reported_as_undecidable(self) -> None:
+        """MET-091: 2128 km is within 207 km of the 2300 km single-hop limit.
+
+        Reporting that as a settled "workable" would make the tool look more
+        certain than the two grid squares it was given.
+        """
+        answer = server.meteor_window(my_grid="DN13", their_grid="EM12",
+                                      shower="PER", when="2026-08-12T09:00Z", hours=0)
+        note = answer["path"]["precision_note"]
+        assert note is not None
+        assert "cannot be decided" in note
+        assert "6-character" in note
+        assert note in answer["summary"]
+
+    def test_a_path_well_inside_the_limits_says_nothing(self) -> None:
+        """MET-092: the control — it must not fire on every answer."""
+        answer = server.meteor_window(my_grid="DN13", their_grid="DM79",
+                                      shower="PER", when="2026-08-12T09:00Z", hours=0)
+        assert answer["path"]["precision_note"] is None
+
+    def test_a_path_well_beyond_the_limits_says_nothing_either(self) -> None:
+        """MET-093: unambiguously too far needs no hedge."""
+        answer = server.meteor_window(my_grid="DN13", their_grid="FM18",
+                                      shower="PER", when="2026-08-12T09:00Z", hours=0)
+        assert answer["path"]["workable_distance"] is False
+        assert answer["path"]["precision_note"] is None
+
+    def test_exact_positions_leave_no_slack_to_report(self) -> None:
+        """MET-094: coordinates decide it, so the hedge disappears."""
+        answer = server.meteor_window(my_lat=43.5, my_lon=-117.0,
+                                      their_lat=30.5, their_lon=-95.0,
+                                      shower="PER", when="2026-08-12T09:00Z", hours=0)
+        assert answer["path"]["distance_uncertainty_km"] == 0.0
+        assert answer["path"]["precision_note"] is None
+
+    def test_the_slack_is_reported_whether_or_not_it_matters(self) -> None:
+        """MET-095: the number is always there to be seen."""
+        answer = server.meteor_window(my_grid="DN13", their_grid="DM79", hours=0)
+        assert answer["path"]["distance_uncertainty_km"] > 150.0

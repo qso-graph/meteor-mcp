@@ -14,6 +14,7 @@ neither station's exact spot in the square matters.
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass
 
@@ -45,6 +46,8 @@ class Place:
     latitude: float
     longitude: float
     precision_chars: int = 4
+    height_deg: float = 1.0
+    width_deg: float = 2.0
 
 
 def valid_locator(locator: str) -> bool:
@@ -73,7 +76,7 @@ def place(locator: str) -> Place:
     if len(text) == 2:
         # A bare field, which ADIF permits. Nothing further to add, and the
         # centre of a 10-by-20-degree box is all it can honestly give.
-        return Place(text, latitude + 5.0, longitude + 10.0, 2)
+        return Place(text, latitude + 5.0, longitude + 10.0, 2, 10.0, 20.0)
 
     # Square: 2 degrees of longitude, 1 of latitude.
     longitude += int(text[2]) * 2.0
@@ -94,4 +97,27 @@ def place(locator: str) -> Place:
 
     # The centre of the square, not its south-west corner.
     return Place(text, latitude + size_lat / 2.0, longitude + size_lon / 2.0,
-                 len(text))
+                 len(text), size_lat, size_lon)
+
+
+# One degree of latitude, near enough everywhere.
+KM_PER_DEGREE = 111.2
+
+
+def uncertainty_km(place: Place) -> float:
+    """How far the station may actually be from the centre this reports.
+
+    A locator names a rectangle and `place` returns its centre, so a station
+    anywhere in that rectangle is consistent with the locator it sent. The
+    worst case is a corner, which is what this gives.
+
+    This is not a rounding error to be ignored. Four characters is what goes
+    over the air: the FT8 and MSK144 structured message payload carries a
+    4-character grid, and 6 or 8 characters only ever reach a log. So the far
+    end of a meteor-scatter path is normally known to about 100 km, and any
+    answer that depends on a distance threshold has to say so.
+    """
+    half_height = place.height_deg / 2.0 * KM_PER_DEGREE
+    half_width = (place.width_deg / 2.0 * KM_PER_DEGREE
+                  * math.cos(math.radians(place.latitude)))
+    return math.hypot(half_height, half_width)

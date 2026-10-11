@@ -83,12 +83,22 @@ The fields are **ADIF's**, not invented here:
 |------------|----------|
 | `MY_GRIDSQUARE` | The default grid. ADIF permits 2, 4, 6 or 8 characters |
 | `MY_GRIDSQUARE_EXT` | Characters 9–12 of a 10- or 12-character locator |
-| `MY_LAT` / `MY_LON` | The exact position, **preferred over a grid square** |
+| `MY_LAT` / `MY_LON` | An exact position, when the station has one |
 
-A grid square is a rectangle, and without coordinates this has to take its centre — about
-110 by 160 km of slack for a 4-character locator, which moved one real path by 38 km in
-testing. So when `MY_LAT` and `MY_LON` are known they win, and the answer says which it
-used.
+**A grid is what hams actually use**, and four characters is what goes over the air: the
+FT8 and MSK144 structured message payload carries a 4-character grid, and 6 or 8
+characters only ever reach a log. Since meteor scatter *is* MSK144, a 4-character locator
+off a decode is the normal input here, not a degraded one.
+
+A grid square is a rectangle, though, and its centre is all a locator gives. Four
+characters is about ±100 km per end, so a path length carries about **±200 km** of slack.
+That is immaterial on a 1100 km path and decisive against a threshold — a path reported as
+2250 km could be 2050 to 2450, which straddles the 2300 km single-hop limit. When a limit
+falls inside that slack the answer says the call **cannot be decided** at on-air precision,
+and what would settle it. The slack is reported either way.
+
+So `MY_LAT`/`MY_LON` are used when a station has them, and the answer always says which it
+used and how precisely each end was located.
 
 A 2-character `MY_GRIDSQUARE` is a legitimate ADIF value but is refused for a path: a
 Maidenhead field is 10 by 20 degrees, around 1100 km across, which is wider than the
