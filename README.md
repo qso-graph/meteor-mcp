@@ -86,11 +86,11 @@ The fields are **ADIF's**, not invented here:
 | `MY_LAT` / `MY_LON` | An exact position, when the station has one |
 
 **A grid is what hams actually use**, so a locator is the normal input here, not a
-degraded one. It may carry 4, 6 or 8 characters. Operators commonly state 6 or 8 for their own station,
-and the open modes — RTTY, PSK, CW, SSB — put no limit on what can be sent. The
-constraint is the fixed-length modes: WSPR, FT8, FT4 and MSK144 pack a message of fixed
-size, so four characters is what fits. Meteor work is mostly MSK144, which makes 4 the
-floor worth planning around here.
+degraded one. It may carry 4, 6 or 8 characters. Operators often state 6 or 8 for their own station,
+while a structured on-air exchange may carry only 4. Which modes constrain it is not
+asserted here: ADIF enumerates every mode and submode but says nothing about payload
+length, so there is no authority to infer precision from mode — **4 is the safe floor for
+all of them.**
 
 A grid square is a rectangle, though, and its centre is all a locator gives. Nothing here
 assumes a precision: the slack is computed from the characters each locator actually

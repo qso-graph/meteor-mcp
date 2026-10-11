@@ -45,7 +45,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **The single-hop call is hedged when the locators cannot decide it.** A grid square is a
   rectangle and its centre is all a locator gives, so the distance carries slack. This is
-  computed from the characters each locator actually carried rather than assumed: about
+  computed from the characters each locator actually carried rather than inferred from the
+  mode — ADIF enumerates modes and submodes but says nothing about payload length, so
+  there is no authority for such an inference and 4 is the safe floor for every mode. About
   ±100 km per end at 4 characters, a few km at 6. At the 4-character floor a path length
   is within roughly ±200 km — immaterial mid-range, decisive against a threshold, since
   2250 km could be 2050 to 2450 and straddle the 2300 km limit. When a limit falls inside

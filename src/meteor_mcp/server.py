@@ -355,16 +355,17 @@ def _precision_note(distance_km: float, slack: float,
                     here: dict[str, Any], there: dict[str, Any]) -> str | None:
     """Say so when the locators are too coarse to decide the single-hop call.
 
-    A locator may arrive with 4, 6 or 8 characters. Operators commonly state 6
-    or 8 for their own station, and the open modes — RTTY, PSK, CW, SSB — put
-    no limit on what can be sent. The fixed-length modes are the constraint:
-    WSPR, FT8, FT4 and MSK144 pack a message of fixed size, so four characters
-    is what fits. Meteor work is mostly MSK144, which makes 4 the floor worth
-    planning around here.
+    A locator may arrive with 4, 6 or 8 characters. Operators often state 6 or
+    8 for their own station, while a structured on-air exchange may carry only
+    4 — and which modes constrain it is not something to assert here. ADIF
+    enumerates every mode and submode but says nothing about payload length or
+    message structure, so there is no authority to infer precision from mode,
+    and a hand-built table of which modes are fixed-length would be a guess
+    wearing a schema. **4 is the safe floor for all of them.**
 
-    This does not assume which arrives — the slack is computed from the
-    characters each locator actually carried. But at that floor two square
-    centres put the path length within about 200 km. That is
+    So this assumes nothing: the slack is computed from the characters each
+    locator actually carried. At the 4-character floor two square centres put
+    the path length within about 200 km. That is
     small against a 1500 km path and decisive against a threshold: a path
     reported as 2250 km could be anywhere from roughly 2050 to 2450, which
     straddles the 2300 km single-hop limit.
@@ -391,7 +392,7 @@ def _precision_note(distance_km: float, slack: float,
                 "cannot be decided at that precision. A 6-character locator or an exact "
                 "position for either end would settle it — but get it from a sked page, "
                 "QRZ or the operator directly rather than expecting it on the air, since "
-                "the fixed-length modes used for meteor work carry only four characters."
+                "an on-air exchange may not carry more than four characters."
             )
     return None
 
