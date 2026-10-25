@@ -30,6 +30,10 @@ KNOWN_PEAKS = [
 ]
 
 
+MONTHS = ("January February March April May June July August September "
+          "October November December").split()
+
+
 class TestSolarLongitude:
     @pytest.mark.parametrize("code,month,day_range", KNOWN_PEAKS)
     def test_the_catalogue_longitude_lands_on_the_known_date(
@@ -48,7 +52,7 @@ class TestSolarLongitude:
         assert peak.month == month and low <= peak.day <= high, (
             f"{code}: solar longitude {shower.solar_longitude_deg} converted to "
             f"{peak:%d %B}, but it is known to peak {low}-{high} "
-            f"{'January February March April May June July August September October November December'.split()[month - 1]}")
+            f"{MONTHS[month - 1]}")
 
     def test_a_longitude_past_180_is_not_half_an_orbit_out(self) -> None:
         """MET-002: the control, and a bug that really happened.
