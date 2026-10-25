@@ -56,7 +56,8 @@ def great_circle(lat1: float, lon1: float, lat2: float, lon2: float) -> tuple[fl
          + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2)
     distance = 2 * EARTH_RADIUS_KM * math.asin(math.sqrt(a))
     bearing = math.atan2(math.sin(dl) * math.cos(p2),
-                         math.cos(p1) * math.sin(p2) - math.sin(p1) * math.cos(p2) * math.cos(dl))
+                         math.cos(p1) * math.sin(p2)
+                         - math.sin(p1) * math.cos(p2) * math.cos(dl))
     return distance, (bearing * R2D) % 360.0
 
 
@@ -135,20 +136,26 @@ def assess(radiant_azimuth: float, radiant_elevation: float,
         return Geometry(radiant_azimuth, radiant_elevation, path_bearing, offset,
                         "no", "the radiant is below the horizon at the path midpoint")
     if radiant_elevation < 15:
-        quality, why = "marginal", "the radiant is barely up; few trails are high enough to reflect"
+        quality = "marginal"
+        why = "the radiant is barely up; few trails are high enough to reflect"
     elif radiant_elevation > 70:
-        quality, why = "marginal", "the radiant is nearly overhead, so trails run down the path rather than across it"
+        quality = "marginal"
+        why = ("the radiant is nearly overhead, so trails run down the path "
+               "rather than across it")
     else:
         quality, why = "good", "the radiant is well placed in elevation"
 
     if offset < 30:
         if quality == "good":
-            quality, why = "marginal", "the radiant lies close to the path bearing, so few trails can be tangent to it"
+            quality = "marginal"
+            why = ("the radiant lies close to the path bearing, so few trails "
+                   "can be tangent to it")
         else:
             why += ", and it lies close to the path bearing"
     elif offset > 60 and quality == "good":
         quality = "best"
-        why = "the radiant is well up and broadside to the path, which is the geometry that reflects"
+        why = ("the radiant is well up and broadside to the path, which is the "
+               "geometry that reflects")
 
     return Geometry(radiant_azimuth, radiant_elevation, path_bearing, offset, quality, why)
 

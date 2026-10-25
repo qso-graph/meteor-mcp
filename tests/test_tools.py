@@ -12,8 +12,21 @@ import urllib.request
 from datetime import datetime
 
 import pytest
+from fastmcp.exceptions import ToolError
 
 from meteor_mcp import grid, live, server, showers
+
+
+def refusal(call, *args, **kwargs) -> str:
+    """The message of a flagged refusal (#8).
+
+    These used to be `{"error": ...}` returned as a successful result; they are
+    `ToolError` now. The message is what the caller acts on, so it is what these
+    tests look at.
+    """
+    with pytest.raises(ToolError) as caught:
+        call(*args, **kwargs)
+    return str(caught.value)
 
 
 class TestShowerCatalogue:
@@ -49,8 +62,7 @@ class TestShowerCatalogue:
 
     def test_an_unknown_shower_is_refused_with_a_way_forward(self) -> None:
         """MET-024: the error names the tool that lists what is there."""
-        answer = server.meteor_shower_info("Hyades")
-        assert "error" in answer and "meteor_showers" in answer["error"]
+        assert "meteor_showers" in refusal(server.meteor_shower_info, "Hyades")
 
 
 class TestShowersNearPeak:
@@ -90,13 +102,14 @@ class TestShowersNearPeak:
     def test_a_bad_time_is_refused_rather_than_guessed(self) -> None:
         """MET-033: a misread date gives a confidently wrong calendar."""
         for bad in ("yesterday", "2026-13-45", "not-a-time"):
-            assert "error" in server.meteor_showers(when=bad), bad
+            refusal(server.meteor_showers, when=bad)
 
 
 class TestWindow:
     def test_it_reports_the_path_the_shower_and_the_hours(self) -> None:
         """MET-040: the three things the question is actually about."""
-        answer = server.meteor_window(my_grid="DN13", their_grid="EM12", hours=6, step_minutes=60)
+        answer = server.meteor_window(my_grid="DN13", their_grid="EM12", hours=6,
+                                      step_minutes=60)
         assert answer["path"]["distance_km"] > 0
         assert {"time_utc", "radiant_elevation_deg", "offset_from_path_deg",
                 "verdict", "why"} <= set(answer["rows"][0])
@@ -113,15 +126,12 @@ class TestWindow:
         the host has not supplied it, the refusal has to name that, or the
         caller has no way to know what is missing.
         """
-        answer = server.meteor_window(their_grid="EM12")
-        assert "error" in answer
-        assert "MY_GRIDSQUARE" in answer["error"]
-        assert "Station" in answer["error"]
+        mine = refusal(server.meteor_window, their_grid="EM12")
+        assert "MY_GRIDSQUARE" in mine
+        assert "Station" in mine
 
         # The far end is the caller's to give, and its absence reads differently.
-        other = server.meteor_window(my_grid="DN13")
-        assert "error" in other
-        assert "other station" in other["error"]
+        assert "other station" in refusal(server.meteor_window, my_grid="DN13")
 
     def test_the_midpoint_decides_not_either_station(self) -> None:
         """MET-042: the reflection happens in the middle, so that is the sky used.
@@ -171,26 +181,29 @@ class TestWindow:
     def test_a_bad_locator_is_refused_not_approximated(self) -> None:
         """MET-047: a mis-read locator points at the wrong sky."""
         for bad in ("", "DN", "ZZ99", "1313", "../etc", "DN13l"):
-            assert "error" in server.meteor_window(my_grid=bad, their_grid="EM12"), bad
-            assert "error" in server.meteor_window(my_grid="DN13", their_grid=bad), bad
+            refusal(server.meteor_window, my_grid=bad, their_grid="EM12")
+            refusal(server.meteor_window, my_grid="DN13", their_grid=bad)
 
     def test_a_bad_time_or_shower_is_refused(self) -> None:
         """MET-048: both inputs that could be silently wrong."""
-        assert "error" in server.meteor_window(my_grid="DN13", their_grid="EM12", when="whenever")
-        assert "error" in server.meteor_window(my_grid="DN13", their_grid="EM12", shower="Hyades")
+        refusal(server.meteor_window, my_grid="DN13", their_grid="EM12", when="whenever")
+        refusal(server.meteor_window, my_grid="DN13", their_grid="EM12", shower="Hyades")
 
     def test_a_huge_request_is_clamped(self) -> None:
         """MET-049: one call must not be able to compute for ever."""
-        answer = server.meteor_window(my_grid="DN13", their_grid="EM12", hours=99_999, step_minutes=60)
+        answer = server.meteor_window(my_grid="DN13", their_grid="EM12",
+                                      hours=99_999, step_minutes=60)
         assert answer["hours"] <= server.MAX_HOURS
         assert len(answer["rows"]) <= server.MAX_ROWS
-        fine = server.meteor_window(my_grid="DN13", their_grid="EM12", hours=48, step_minutes=0.001)
+        fine = server.meteor_window(my_grid="DN13", their_grid="EM12", hours=48,
+                                    step_minutes=0.001)
         assert len(fine["rows"]) <= server.MAX_ROWS
 
     def test_nulls_are_treated_as_defaults(self) -> None:
         """MET-050: llama.cpp and mcpo send null for optional parameters."""
         assert "error" not in server.meteor_window(
-            my_grid="DN13", their_grid="EM12", shower=None, when=None, hours=None, step_minutes=None)
+            my_grid="DN13", their_grid="EM12", shower=None, when=None, hours=None,
+            step_minutes=None)
         assert "error" not in server.meteor_showers(when=None, limit=None)
 
     def test_the_verdict_is_words_with_a_reason_not_a_score(self) -> None:
@@ -216,8 +229,10 @@ class TestWindow:
         elevation alone.
         """
         when = "2026-08-12T09:00Z"
-        broadside = server.meteor_window(my_grid="DN13", their_grid="EM12", shower="PER", when=when, hours=0)
-        along = server.meteor_window(my_grid="DN13", their_grid="DM03", shower="PER", when=when, hours=0)
+        broadside = server.meteor_window(my_grid="DN13", their_grid="EM12",
+                                         shower="PER", when=when, hours=0)
+        along = server.meteor_window(my_grid="DN13", their_grid="DM03",
+                                     shower="PER", when=when, hours=0)
         rank = {"no": 0, "marginal": 1, "good": 2, "best": 3}
         assert broadside["rows"][0]["offset_from_path_deg"] > \
             along["rows"][0]["offset_from_path_deg"]
@@ -255,23 +270,21 @@ class TestWindow:
         MY_GRIDSQUARE value, so the refusal explains the precision rather than
         calling it invalid, which would be wrong and unhelpful.
         """
-        answer = server.meteor_window(my_grid="DN", their_grid="EM12")
-        assert "error" in answer
-        assert "2 characters" in answer["error"]
-        assert "1100 km" in answer["error"]
+        message = refusal(server.meteor_window, my_grid="DN", their_grid="EM12")
+        assert "2 characters" in message
+        assert "1100 km" in message
         # It is still a readable locator; this is a precision judgement.
         assert grid.place("DN").precision_chars == 2
 
     def test_half_a_coordinate_pair_is_refused(self) -> None:
         """MET-056: a latitude with no longitude is a mistake, not a default."""
-        assert "error" in server.meteor_window(my_lat=43.5, their_grid="EM12")
-        assert "error" in server.meteor_window(my_lon=-117.0, their_grid="EM12")
+        refusal(server.meteor_window, my_lat=43.5, their_grid="EM12")
+        refusal(server.meteor_window, my_lon=-117.0, their_grid="EM12")
 
     def test_a_position_off_the_earth_is_refused(self) -> None:
         """MET-057: swapped latitude and longitude is the common form of this."""
         for lat, lon in ((91.0, 0.0), (-91.0, 0.0), (0.0, 181.0), (-117.0, 43.5)):
-            answer = server.meteor_window(my_lat=lat, my_lon=lon, their_grid="EM12")
-            assert "error" in answer, (lat, lon)
+            refusal(server.meteor_window, my_lat=lat, my_lon=lon, their_grid="EM12")
 
 class TestAttribution:
     def test_every_answer_using_a_radiant_cites_the_owner(self) -> None:
@@ -324,15 +337,33 @@ class TestLiveSources:
         assert server.meteor_source_info()["carried_showers"] == 113
         assert server.get_version_info()["service_name"] == "meteor-mcp"
 
-    def test_a_live_source_being_down_is_reported_not_raised(self, monkeypatch) -> None:
-        """MET-071: an unreachable source is an answer, not a stack trace."""
+    def test_a_live_source_being_down_is_flagged_and_says_nothing_away(
+        self, monkeypatch,
+    ) -> None:
+        """MET-071: an unreachable source is a flagged error, not a stack trace.
+
+        It used to be *reported* — returned as a successful result carrying an
+        `error` key — and the name of this test said so. It is raised now (#8),
+        which is what the specification asks for: an upstream source failing is an
+        error from the tool, so `isError: true`.
+
+        What has not changed, and matters more, is that the message gives nothing
+        away. `live.LiveError` says "the source could not be reached", never the
+        URL, the exception or a traceback, and the tool only names which source it
+        was. A failure is allowed to say a source is down; it is not allowed to
+        describe this server's insides.
+        """
         def down(*args, **kwargs):
             raise live.LiveError("the source could not be reached")
 
         monkeypatch.setattr(live, "activity", down)
         monkeypatch.setattr(live, "fireballs", down)
-        assert "error" in server.meteor_activity()
-        assert "error" in server.meteor_fireballs(limit=1)
+
+        for message in (refusal(server.meteor_activity),
+                        refusal(server.meteor_fireballs, limit=1)):
+            assert "could not be reached" in message
+            for leak in ("Traceback", "urllib", "https://", "ssl", "/Users/", "line "):
+                assert leak not in message, f"a failure leaked {leak!r}: {message}"
 
     def test_gmn_counts_are_parsed_from_the_real_file_format(self, monkeypatch) -> None:
         """MET-072: the semicolon format, sporadics and all.
@@ -344,7 +375,8 @@ class TestLiveSources:
         """
         sample = (
             "# Summary generated on 2026-10-11 14:24:58 UTC\n"
-            "# Unique trajectory identifier; Beginning Julian date; Beginning UTC Time; IAU No; IAU code\n"
+            "# Unique trajectory identifier; Beginning Julian date; "
+            "Beginning UTC Time; IAU No; IAU code\n"
             "20261011_a; 2461324.1; 2026-10-11 16:09:00;    7;   PER;\n"
             "20261011_b; 2461324.2; 2026-10-11 17:09:00;    7;   PER;\n"
             "20261011_c; 2461324.3; 2026-10-11 18:09:00;   -1;   ...;\n"
@@ -354,7 +386,8 @@ class TestLiveSources:
         answer = live.activity()
         assert answer["meteors_counted"] == 4
         assert answer["sporadic"] == 1
-        assert answer["by_shower"] == [{"code": "PER", "count": 2}, {"code": "SOR", "count": 1}]
+        assert answer["by_shower"] == [{"code": "PER", "count": 2},
+                                       {"code": "SOR", "count": 1}]
         assert answer["generated_utc"].startswith("2026-10-11")
         assert "CC BY 4.0" in answer["source"]["licence"]
         assert "Attribution is a condition" in answer["source"]["attribution"]

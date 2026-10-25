@@ -5,6 +5,62 @@ All notable changes to `meteor-mcp` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+**Upgrading:** a tool that fails now returns `isError: true` instead of a successful result whose
+payload carried an `error` key. That covers both kinds of failure — bad input, and the Global
+Meteor Network or NASA CNEOS being unreachable. Anything reading `result["error"]` should read the
+error flag instead. The messages are unchanged.
+
+### MCP specification 2026-07-28 (#8)
+
+- **Tool errors are flagged `isError`.** `_err` built `{"error": message}` and **nine** call sites
+  returned it. It raises `ToolError` now, typed `NoReturn`.
+- **Both kinds of failure are flagged, because the specification treats them the same.** Bad input
+  (a time that cannot be read, a shower not in the IAU MDC list, a limit that is not a whole
+  number) and an upstream source failing. A JSON-RPC protocol error is for a request the server
+  cannot route at all; "an API request failure" is on the specification's own list of tool
+  execution errors.
+- **This server needed two annotation blocks, and that is the point of reading each tool.** Five
+  answer from the MDC shower list carried in the package plus geometry; `meteor_activity` reads the
+  Global Meteor Network and `meteor_fireballs` reads NASA CNEOS. **Five `false`, two `true`.** One
+  block would have advertised five closed-domain tools as open-world — or, far worse, advertised
+  two network calls as closed. `MT-C12` reads `server.py` and asserts that exactly the tools whose
+  bodies reach `live.` are the ones publishing `openWorldHint: true`, compared against the
+  *published* annotations rather than a list in the test, so moving a decorator cannot leave it
+  green.
+- **`certifi` is already correct here, and is now asserted rather than noted.** This is the only
+  repo in the sweep where qso-graph-devel#73 applies at all: `live.py` builds its context with
+  `ssl.create_default_context(cafile=certifi.where())`. `MT-C20` holds that, `MT-C21` holds that
+  verification is never turned off, and `MT-C22` holds that `live.py` is the *only* module that
+  reaches the network — so there is one place to get TLS right.
+- **A failure says a source is down without describing our insides.** `live.LiveError` is
+  deliberately vague ("the source could not be reached") and the tool adds only which source it
+  was. `MT-C41` asserts no URL, traceback or filesystem path reaches the caller — an error path is
+  exactly where that leaks by accident.
+- **A test of mine could not fail, and falsifying it is what showed that.** `MT-C30` originally
+  asserted only that bad input raised `ToolError`. With `_err` returning a payload instead of
+  raising, the bare call sites let execution continue and the tool crashed a few lines later —
+  `AttributeError: 'NoneType' object has no attribute 'iau_number'` — which FastMCP delivers as a
+  `ToolError` too. **A crash and a refusal were indistinguishable to it.** It now asserts the
+  message each refusal was written with, and `MT-C31` generalises that: whatever a tool refuses, it
+  must not do it by leaking a Python exception.
+- `tests/test_mcp_conformance.py` (MT-C01 onward, 16 tests). Every check falsified — **12 of 12** —
+  including `MT-C30` and `MT-C31` against the patch that defeated the first version.
+- **Nothing moved on the wire but the annotations**, verified through a real `fastmcp.Client`.
+
+### Lint (#7)
+
+- **`E501` is adopted.** 17 lines, not one a defect.
+- **The publisher-name exemption is not needed, in the one repo where it nearly was.** One line
+  quotes GMN's own file header verbatim — `# Unique trajectory identifier; Beginning Julian date;
+  Beginning UTC Time; IAU No; IAU code` — and it splits as adjacent string literals, so the value
+  is **byte-identical**; the test that parses GMN's real format still passes. Zero exemptions, and
+  no `# noqa` anywhere in the repo.
+- **Every tool description came out byte-identical**, because none of the long lines was in a
+  docstring.
+- Falsified: a long line planted in `src/`, caught.
+
 ## [0.1.0] — 2026-10-11
 
 ### Added

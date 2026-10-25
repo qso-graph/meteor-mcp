@@ -22,9 +22,10 @@ from __future__ import annotations
 
 import sys
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, NoReturn
 
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 
 from . import __version__, geometry, grid, live, showers, sun
 
@@ -116,8 +117,29 @@ def _endpoint(locator: str | None, latitude: float | None, longitude: float | No
     }
 
 
-def _err(message: str) -> dict[str, Any]:
-    return {"error": message}
+def _err(message: str) -> NoReturn:
+    """Report a tool execution error the way the protocol specifies.
+
+    This returned ``{"error": message}`` as a *successful* result, so a client could not
+    tell a failure from an answer. The specification says of ``CallToolResult.isError``
+    that otherwise "the LLM would not be able to see that an error occurred and
+    self-correct".
+
+    Nine call sites reach it, and they are two different kinds of failure, which the
+    specification treats the same way:
+
+    * **bad input** — a time that cannot be read, a shower not in the IAU MDC list, a
+      limit that is not a whole number;
+    * **an upstream source failing** — the Global Meteor Network or NASA CNEOS not
+      answering.
+
+    Both are errors *from the tool*, so both are ``isError: true`` rather than a
+    JSON-RPC protocol error, which is reserved for a request the server cannot route at
+    all. The upstream messages stay as vague as ``live.LiveError`` makes them: "the
+    source answered 404", never the URL or the exception. That is deliberate, and
+    tests/test_mcp_conformance.py holds it.
+    """
+    raise ToolError(message)
 
 
 def _parse_when(when: str | None) -> datetime | None:
@@ -128,7 +150,9 @@ def _parse_when(when: str | None) -> datetime | None:
         parsed = datetime.fromisoformat(str(when).replace("Z", "+00:00"))
     except ValueError:
         return None
-    return parsed.astimezone(timezone.utc) if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+    if parsed.tzinfo:
+        return parsed.astimezone(timezone.utc)
+    return parsed.replace(tzinfo=timezone.utc)
 
 
 def _citation() -> dict[str, Any]:
@@ -213,7 +237,40 @@ def _nearest_peak(moment: datetime) -> showers.Shower | None:
     return min(rated, key=lambda pair: pair[0])[1] if rated else None
 
 
-@mcp.tool()
+# MCP 2026-07-28 tool annotations. The defaults are pessimistic — a tool that declares
+# nothing is advertised as destructive, non-idempotent and open-world, and the
+# specification tells a client it may keep a human in the loop for that.
+#
+# This server needs **two** blocks, and that is the whole point of reading each tool
+# rather than copying one. Five tools answer from the IAU Meteor Data Center's shower
+# list carried in the package, plus arithmetic. Two read somebody else's live service.
+# A single block would have advertised five closed-domain tools as open-world, or — far
+# worse — advertised two network calls as closed.
+_ANSWERS_FROM_CARRIED_DATA = {
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    # The shower list ships in the wheel and the geometry is arithmetic, so the same
+    # arguments give the same answer until the package is upgraded.
+    "idempotentHint": True,
+    # Nothing leaves the machine.
+    "openWorldHint": False,
+}
+
+_READS_A_LIVE_SERVICE = {
+    "readOnlyHint": True,
+    "destructiveHint": False,
+    # True in the sense the specification means: the tool changes nothing at the far
+    # end. Its *answers* move, because GMN rewrites today's file during the day and
+    # CNEOS gains fireballs — which is why meteor_activity returns the generation time.
+    "idempotentHint": True,
+    # These reach the Global Meteor Network and NASA CNEOS. Neither is a closed domain:
+    # we do not control what they hold and cannot enumerate it. The specification's own
+    # closed-domain example is a database query, and this is the opposite of one.
+    "openWorldHint": True,
+}
+
+
+@mcp.tool(annotations=_ANSWERS_FROM_CARRIED_DATA)
 def meteor_window(
     their_grid: str | None = None,
     my_grid: str | None = None,
@@ -264,14 +321,14 @@ def meteor_window(
     """
     moment = _parse_when(when)
     if moment is None:
-        return _err(f"'{when}' is not a time I can read. Use ISO 8601, e.g. 2026-08-12T02:00Z.")
+        _err(f"'{when}' is not a time I can read. Use ISO 8601, e.g. 2026-08-12T02:00Z.")
 
     try:
         here_lat, here_lon, here_where = _endpoint(my_grid, my_lat, my_lon, "your own")
         there_lat, there_lon, there_where = _endpoint(
             their_grid, their_lat, their_lon, "the other station's")
     except EndpointError as error:
-        return _err(str(error))
+        _err(str(error))
 
     span = min(max(float(hours if hours is not None else 12.0), 0.0), MAX_HOURS)
     step = max(float(step_minutes if step_minutes is not None else 30.0), MIN_STEP_MINUTES)
@@ -279,13 +336,13 @@ def meteor_window(
     if shower:
         chosen = showers.find(str(shower))
         if chosen is None:
-            return _err(f"I do not have a shower called '{shower}' in the IAU MDC list. "
+            _err(f"I do not have a shower called '{shower}' in the IAU MDC list. "
                         "meteor_showers lists what is there.")
         picked_how = "as asked"
     else:
         chosen = _nearest_peak(moment)
         if chosen is None:
-            return _err("No shower in the carried catalogue has a published maximum.")
+            _err("No shower in the carried catalogue has a published maximum.")
         picked_how = "nearest its published peak; none was named"
 
     distance_km, bearing = geometry.great_circle(
@@ -377,7 +434,8 @@ def _precision_note(distance_km: float, slack: float,
     """
     if slack <= 0.0:
         return None
-    for limit, name in ((geometry.MIN_PATH_KM, "minimum"), (geometry.MAX_PATH_KM, "single-hop")):
+    bounds = ((geometry.MIN_PATH_KM, "minimum"), (geometry.MAX_PATH_KM, "single-hop"))
+    for limit, name in bounds:
         if abs(distance_km - limit) < slack:
             ends = []
             for label, where in (("yours", here), ("theirs", there)):
@@ -435,12 +493,13 @@ def _summarise(rows: list[dict[str, Any]], workable: list[dict[str, Any]],
     head = max(workable, key=lambda row: (rank.get(row["verdict"], 0),
                                           row["radiant_elevation_deg"]))
     text = (f"Workable for {len(workable)} of {len(rows)} sampled times; the best geometry is "
-            f"around {head['time_utc']}, radiant {head['radiant_elevation_deg']:.0f} degrees up "
+            f"around {head['time_utc']}, radiant "
+            f"{head['radiant_elevation_deg']:.0f} degrees up "
             f"and {head['offset_from_path_deg']:.0f} degrees off the path. {when_text}.")
     return f"{text} {note}" if note else text
 
 
-@mcp.tool()
+@mcp.tool(annotations=_ANSWERS_FROM_CARRIED_DATA)
 def meteor_showers(when: str | None = None, limit: int | None = 12) -> dict[str, Any]:
     """Which showers are near their peak, closest first.
 
@@ -455,7 +514,7 @@ def meteor_showers(when: str | None = None, limit: int | None = 12) -> dict[str,
     """
     moment = _parse_when(when)
     if moment is None:
-        return _err(f"'{when}' is not a time I can read. Use ISO 8601.")
+        _err(f"'{when}' is not a time I can read. Use ISO 8601.")
     count = max(1, min(int(limit) if limit is not None else 12, 200))
 
     rated: list[tuple[float, showers.Shower]] = []
@@ -479,7 +538,7 @@ def meteor_showers(when: str | None = None, limit: int | None = 12) -> dict[str,
     }
 
 
-@mcp.tool()
+@mcp.tool(annotations=_ANSWERS_FROM_CARRIED_DATA)
 def meteor_shower_info(shower: str) -> dict[str, Any]:
     """Every published solution for one shower, unaveraged.
 
@@ -493,7 +552,7 @@ def meteor_shower_info(shower: str) -> dict[str, Any]:
     """
     found = showers.find(str(shower))
     if found is None:
-        return _err(f"I do not have a shower called '{shower}' in the IAU MDC list. "
+        _err(f"I do not have a shower called '{shower}' in the IAU MDC list. "
                     "meteor_showers lists what is there.")
     moment = datetime.now(timezone.utc)
     every = showers.solutions(found.iau_number)
@@ -522,7 +581,7 @@ def meteor_shower_info(shower: str) -> dict[str, Any]:
     }
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READS_A_LIVE_SERVICE)
 def meteor_activity() -> dict[str, Any]:
     """How many meteors the Global Meteor Network has actually confirmed today.
 
@@ -537,10 +596,10 @@ def meteor_activity() -> dict[str, Any]:
     try:
         return live.activity()
     except live.LiveError as error:
-        return _err(f"The Global Meteor Network could not be read: {error}.")
+        _err(f"The Global Meteor Network could not be read: {error}.")
 
 
-@mcp.tool()
+@mcp.tool(annotations=_READS_A_LIVE_SERVICE)
 def meteor_fireballs(limit: int | None = 10) -> dict[str, Any]:
     """Recent fireballs recorded by NASA CNEOS.
 
@@ -553,12 +612,12 @@ def meteor_fireballs(limit: int | None = 10) -> dict[str, Any]:
     try:
         return live.fireballs(int(limit) if limit is not None else 10)
     except live.LiveError as error:
-        return _err(f"NASA CNEOS could not be read: {error}.")
+        _err(f"NASA CNEOS could not be read: {error}.")
     except (TypeError, ValueError):
-        return _err("limit must be a whole number.")
+        _err("limit must be a whole number.")
 
 
-@mcp.tool()
+@mcp.tool(annotations=_ANSWERS_FROM_CARRIED_DATA)
 def meteor_source_info() -> dict[str, Any]:
     """Where every number in this server comes from, and how to cite it.
 
@@ -592,7 +651,7 @@ def _version_info_payload() -> dict[str, Any]:
     }
 
 
-@mcp.tool()
+@mcp.tool(annotations=_ANSWERS_FROM_CARRIED_DATA)
 def get_version_info() -> dict[str, Any]:
     """This server's version and the edition of the shower list it carries."""
     return _version_info_payload()
