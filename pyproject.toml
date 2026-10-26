@@ -1,6 +1,6 @@
 [project]
 name = "meteor-mcp"
-version = "0.2.1"
+version = "0.3.0"
 description = "Meteor scatter MCP server: shower timing, radiant geometry between two stations, live counts"
 readme = "README.md"
 license = {text = "GPL-3.0-or-later"}
