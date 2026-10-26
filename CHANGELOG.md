@@ -5,6 +5,27 @@ All notable changes to `meteor-mcp` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- **Requests to the Global Meteor Network and JPL's SSD API are now spaced.** Where a provider states a request
+  limit this server honours that limit; the Global Meteor Network and JPL's SSD API states none, so the gap is a
+  recorded judgement rather than a published figure — 200 ms, matching what
+  `sota-mcp` and `iota-mcp` already use, with the reasoning written beside the
+  constant so it can be revisited rather than rediscovered. A volunteer or public
+  service with no stated limit still deserves restraint (KI7MT, 2026-10-11).
+
+  This is not throttling the user. It limits what this server sends to somebody
+  else's service; it does not limit the person asking. The response cache does the
+  larger share of the work by removing requests rather than delaying them, and the
+  spacing covers what a cache cannot: a model calling tools in a loop over inputs
+  that each miss.
+- `test_only_live_reaches_the_network` matched any line containing `requests.`,
+  including prose, so a comment could fail it. It now skips comment lines, and was
+  checked against a planted `import urllib.request` to confirm it still catches code.
+
+
 ## [0.3.0] — 2026-10-26
 
 ### Changed

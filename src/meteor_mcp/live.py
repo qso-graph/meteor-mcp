@@ -29,6 +29,8 @@ from typing import Any
 
 import certifi
 
+from . import ratelimit
+
 # Said once, here. A source that cannot identify who is calling it cannot ask
 # us to slow down, and a ham radio project should be reachable.
 USER_AGENT = "meteor-mcp (+https://github.com/qso-graph/meteor-mcp; maintainers@qso-graph.io)"
@@ -54,6 +56,7 @@ def _context() -> ssl.SSLContext:
 def _fetch(url: str) -> str:
     """Text from a URL, or a LiveError whose message gives nothing away."""
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+    ratelimit.wait()
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS,
                                     context=_context()) as response:
