@@ -211,6 +211,7 @@ class TestTlsIsNotWeakened:
             for py, text in _sources()
             for i, line in enumerate(text.splitlines(), 1)
             if py.name != "live.py"
+            and not line.strip().startswith("#")
             and any(t in line for t in ("urlopen", "urllib.request", "http.client",
                                         "socket.", "requests.", "httpx."))
         ]

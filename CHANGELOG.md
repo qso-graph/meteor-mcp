@@ -5,6 +5,44 @@ All notable changes to `meteor-mcp` are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **A `429` is now honoured, per source.** This server reads two unrelated
+  services — the Global Meteor Network and NASA's CNEOS fireball API — and
+  either asking this client to stop is the most explicit form a request limit
+  takes. It was previously reported as a plain status and the next tool call
+  sent another request. Now the `Retry-After` interval is read and bounded to
+  between a minute and an hour, nothing more goes to *that* source until it has
+  passed, and the tool says how long to wait. The other source is unaffected: a
+  fireball-API limit must not stop meteor-activity readings. It does not sleep
+  through the wait — a tool call is synchronous and an hour's sleep inside one is
+  a hang, so it refuses quickly and says when to come back. A `503` is treated as
+  an outage unless it carries `Retry-After`, in which case it is a deliberate
+  shed and honoured the same way.
+
+## [Unreleased]
+
+### Changed
+
+- **Requests to the Global Meteor Network and JPL's SSD API are now spaced.** Where a provider states a request
+  limit this server honours that limit; the Global Meteor Network and JPL's SSD API states none, so the gap is a
+  recorded judgement rather than a published figure — 200 ms, matching what
+  `sota-mcp` and `iota-mcp` already use, with the reasoning written beside the
+  constant so it can be revisited rather than rediscovered. A volunteer or public
+  service with no stated limit still deserves restraint (KI7MT, 2026-10-11).
+
+  This is not throttling the user. It limits what this server sends to somebody
+  else's service; it does not limit the person asking. The response cache does the
+  larger share of the work by removing requests rather than delaying them, and the
+  spacing covers what a cache cannot: a model calling tools in a loop over inputs
+  that each miss.
+- `test_only_live_reaches_the_network` matched any line containing `requests.`,
+  including prose, so a comment could fail it. It now skips comment lines, and was
+  checked against a planted `import urllib.request` to confirm it still catches code.
+
+
 ## [0.3.0] — 2026-10-26
 
 ### Changed
