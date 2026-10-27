@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **A `429` is now honoured, per source.** This server reads two unrelated
+  services — the Global Meteor Network and NASA's CNEOS fireball API — and
+  either asking this client to stop is the most explicit form a request limit
+  takes. It was previously reported as a plain status and the next tool call
+  sent another request. Now the `Retry-After` interval is read and bounded to
+  between a minute and an hour, nothing more goes to *that* source until it has
+  passed, and the tool says how long to wait. The other source is unaffected: a
+  fireball-API limit must not stop meteor-activity readings. It does not sleep
+  through the wait — a tool call is synchronous and an hour's sleep inside one is
+  a hang, so it refuses quickly and says when to come back. A `503` is treated as
+  an outage unless it carries `Retry-After`, in which case it is a deliberate
+  shed and honoured the same way.
+
+## [Unreleased]
+
 ### Changed
 
 - **Requests to the Global Meteor Network and JPL's SSD API are now spaced.** Where a provider states a request

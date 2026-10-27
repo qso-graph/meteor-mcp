@@ -56,15 +56,34 @@ def _context() -> ssl.SSLContext:
 def _fetch(url: str) -> str:
     """Text from a URL, or a LiveError whose message gives nothing away."""
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    ratelimit.wait()
     try:
+        ratelimit.wait(url)
         with urllib.request.urlopen(request, timeout=TIMEOUT_SECONDS,
                                     context=_context()) as response:
             text: str = response.read().decode("utf-8", errors="replace")
             return text
+    except ratelimit.RateLimited as limited:
+        # ratelimit.wait() refused because a previous 429 from this host is
+        # still in force. Carried over to this module's error type so the
+        # server's existing handler frames it with the source's name; the
+        # sentence naming the wait is what reaches the user either way.
+        raise LiveError(str(limited)) from None
     except urllib.error.HTTPError as error:
-        # The status only. A server's error body can echo the request back, and
-        # nothing from it belongs in an answer.
+        # A 429 is the source stating its limit outright, so it is honoured:
+        # nothing more goes to this host until the interval passes. Only the
+        # status and Retry-After are read -- a server's error body can echo the
+        # request back, and nothing from it belongs in an answer. 503 counts
+        # only with Retry-After, which is a deliberate shed; a bare 503 is an
+        # outage and falls through to the status below.
+        if error.code == 429 or (
+            error.code == 503 and error.headers.get("Retry-After")
+        ):
+            wait = ratelimit.block(url, error.headers.get("Retry-After"))
+            raise LiveError(
+                "it is rate limiting this client; try again in "
+                f"{max(1, round(wait))} s"
+            ) from None
+        # The status only.
         raise LiveError(f"the source answered {error.code}") from None
     except (urllib.error.URLError, TimeoutError, ssl.SSLError):
         raise LiveError("the source could not be reached") from None
