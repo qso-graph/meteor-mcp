@@ -10,7 +10,7 @@ dependencies = [
     "fastmcp>=4.0,<5",
     # A current root set. NASA's API chains to a Sectigo root that older
     # system OpenSSL stores do not carry; see live.py.
-    "certifi",
+    "certifi>=2026.10.19",
 ]
 keywords = ["amateur-radio", "ham-radio", "qso-graph", "mcp", "model-context-protocol"]
 classifiers = [
