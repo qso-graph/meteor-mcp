@@ -7,7 +7,7 @@ Meteor scatter planning for amateur radio: **can these two stations work each ot
 this shower, and when.**
 
 That is the whole shape of it. Meteor scatter is a point-to-point mode, so a radiant
-elevation on its own tells an operator nothing they can act on — the question is always
+elevation on its own tells an operator nothing they can act on—the question is always
 about a path between two stations.
 
 Part of the [qso-graph](https://qso-graph.io/) project.
@@ -22,7 +22,7 @@ point would have to be nearly overhead, where there is very little qualifying sk
 and it sits below both horizons. 800–2000 km is where the geometry is best, and it is
 what hams actually run.
 
-**2. Radiant elevation at the path midpoint** — not at either station. The reflection
+**2. Radiant elevation at the path midpoint**—not at either station. The reflection
 happens near the middle, so that is the sky that matters. Below the horizon there are no
 trails to reflect from. Very high is also poor, because trails then run down the path
 rather than across it.
@@ -32,7 +32,7 @@ it is the one that decides whether a reflection is geometrically possible at all
 reflects specularly only where it is **tangent to the ellipsoid with both stations at its
 foci**. Trails running *along* the path can never be tangent to it; trails running
 *across* it can. So a radiant broadside to the path is good and a radiant up- or
-down-path is poor — at the very same elevation.
+down-path is poor—at the very same elevation.
 
 All three are reported, and the verdict says which one decided it.
 
@@ -45,7 +45,7 @@ imply a precision none of that supports. So the answer is `no` / `marginal` / `g
 
 ## Where the numbers come from
 
-Shower radiants, numbers and names are the **IAU Meteor Data Center's** — the body that
+Shower radiants, numbers and names are the **IAU Meteor Data Center's**—the body that
 names and numbers meteor showers. The package carries the facts read from the MDC's
 *Established showers* file with its URL and SHA-256 recorded, so the exact edition served
 is identifiable. The MDC is maintained on an unpaid voluntary basis and asks to be cited;
@@ -53,7 +53,7 @@ its requested references are returned by `meteor_source_info`, printed in
 [NOTICE](NOTICE), and travel inside every answer that uses a radiant.
 
 The MDC lists **several published solutions per shower**, each from a different study.
-All of them are kept and **none is blended** — the average of two published radiants is a
+All of them are kept and **none is blended**—the average of two published radiants is a
 third that nobody published and no paper stands behind. Tools return the first-listed
 solution, labelled, and `meteor_shower_info` gives them all.
 
@@ -66,7 +66,7 @@ Two tools read the network, because only those two report what is happening righ
 
 | Source | Used for | Licence |
 |--------|----------|---------|
-| [Global Meteor Network](https://globalmeteornetwork.org/) | Confirmed meteor counts today, by shower | CC BY 4.0 — attribution is a licence condition, and is returned in the answer |
+| [Global Meteor Network](https://globalmeteornetwork.org/) | Confirmed meteor counts today, by shower | CC BY 4.0—attribution is a licence condition, and is returned in the answer |
 | [NASA CNEOS](https://ssd-api.jpl.nasa.gov/fireball.api) | Recent fireballs | US government work |
 
 Everything else is computed locally and needs no network at all.
@@ -74,7 +74,7 @@ Everything else is computed locally and needs no network at all.
 ## Your own end comes from your station profile
 
 `meteor_window` needs both ends of the path, but you should not have to retype your own.
-Your end is optional, and a host that knows the operator's station supplies it — in QG
+Your end is optional, and a host that knows the operator's station supplies it—in QG
 Desktop that is the **Station** component.
 
 The fields are **ADIF's**, not invented here:
@@ -89,14 +89,14 @@ The fields are **ADIF's**, not invented here:
 degraded one. It may carry 4, 6 or 8 characters. Operators often state 6 or 8 for their own station,
 while a structured on-air exchange may carry only 4. Which modes constrain it is not
 asserted here: ADIF enumerates every mode and submode but says nothing about payload
-length, so there is no authority to infer precision from mode — **4 is the safe floor for
+length, so there is no authority to infer precision from mode—**4 is the safe floor for
 all of them.**
 
 A grid square is a rectangle, though, and its centre is all a locator gives. Nothing here
 assumes a precision: the slack is computed from the characters each locator actually
 carried. At 4 characters that is about ±100 km per end, so a path length carries about
 **±200 km** of slack; at 6 it falls to a few km.
-That is immaterial on a 1100 km path and decisive against a threshold — a path reported as
+That is immaterial on a 1100 km path and decisive against a threshold—a path reported as
 2250 km could be 2050 to 2450, which straddles the 2300 km single-hop limit. When a limit
 falls inside that slack the answer says the call **cannot be decided** at on-air precision,
 and what would settle it. The slack is reported either way.
@@ -112,7 +112,7 @@ the locator invalid, because it isn't.
 ### Home, portable, and remote all work the same way
 
 ADIF's location fields describe the **transmitting station**, not where the operator is
-sitting — `MY_LAT` is *"the logging station's latitude"*. That is what makes a remote
+sitting—`MY_LAT` is *"the logging station's latitude."* That is what makes a remote
 operation come out right without a special case: the reflection geometry depends on where
 the antenna is. ADIF separates the three callsigns for exactly this reason —
 `STATION_CALLSIGN` (used over the air), `OPERATOR` (the person), and `OWNER_CALLSIGN`
@@ -144,9 +144,8 @@ No credentials, no accounts, no configuration.
 ### A count is not a flux
 
 `meteor_activity` returns the **number of confirmed trajectories** the Global Meteor
-Network has recorded today, broken down by IAU shower code. That is not a flux density —
-meteoroids per square kilometre per hour, corrected for camera coverage and limiting
-magnitude — which is a different quantity GMN computes separately. The tool is named and
+Network has recorded today, broken down by IAU shower code. That is not a flux density—meteoroids per square kilometre per hour, corrected for camera coverage and limiting
+magnitude—which is a different quantity GMN computes separately. The tool is named and
 documented for what it actually returns. GMN writes the file during the day, so an early
 read covers a partial day; the generation time comes back with the answer.
 
