@@ -57,16 +57,16 @@ All of them are kept and **none is blended**—the average of two published radi
 third that nobody published and no paper stands behind. Tools return the first-listed
 solution, labelled, and `meteor_shower_info` gives them all.
 
-Peaks are stored as **solar longitude**, not as dates, because that is how the catalogue
+Peaks are stored as **solar longitude**, not as dates, because that is how the catalog
 publishes them and it is the right way round: solar longitude names the same point in the
 stream every year, while a date drifts. This server converts it to the date it falls on
 in the year you ask about.
 
 Two tools read the network, because only those two report what is happening right now:
 
-| Source | Used for | Licence |
+| Source | Used for | License |
 |--------|----------|---------|
-| [Global Meteor Network](https://globalmeteornetwork.org/) | Confirmed meteor counts today, by shower | CC BY 4.0—attribution is a licence condition, and is returned in the answer |
+| [Global Meteor Network](https://globalmeteornetwork.org/) | Confirmed meteor counts today, by shower | CC BY 4.0—attribution is a license condition, and is returned in the answer |
 | [NASA CNEOS](https://ssd-api.jpl.nasa.gov/fireball.api) | Recent fireballs | US government work |
 
 Everything else is computed locally and needs no network at all.
@@ -92,7 +92,7 @@ asserted here: ADIF enumerates every mode and submode but says nothing about pay
 length, so there is no authority to infer precision from mode—**4 is the safe floor for
 all of them.**
 
-A grid square is a rectangle, though, and its centre is all a locator gives. Nothing here
+A grid square is a rectangle, though, and its center is all a locator gives. Nothing here
 assumes a precision: the slack is computed from the characters each locator actually
 carried. At 4 characters that is about ±100 km per end, so a path length carries about
 **±200 km** of slack; at 6 it falls to a few km.
@@ -139,12 +139,12 @@ No credentials, no accounts, no configuration.
 | `meteor_activity` | How many meteors the Global Meteor Network has confirmed today, by shower (reads the network) |
 | `meteor_fireballs` | Recent fireballs from NASA CNEOS (reads the network) |
 | `meteor_source_info` | Where every number comes from, the edition checksum, and how to cite it |
-| `get_version_info` | Service version and the catalogue edition carried |
+| `get_version_info` | Service version and the catalog edition carried |
 
 ### A count is not a flux
 
 `meteor_activity` returns the **number of confirmed trajectories** the Global Meteor
-Network has recorded today, broken down by IAU shower code. That is not a flux density—meteoroids per square kilometre per hour, corrected for camera coverage and limiting
+Network has recorded today, broken down by IAU shower code. That is not a flux density—meteoroids per square kilometer per hour, corrected for camera coverage and limiting
 magnitude—which is a different quantity GMN computes separately. The tool is named and
 documented for what it actually returns. GMN writes the file during the day, so an early
 read covers a partial day; the generation time comes back with the answer.
@@ -223,6 +223,6 @@ Point both antennas near the **path bearing**, not at the radiant. The reflectio
 near the path midpoint; the radiant's position decides whether a trail there can be
 tangent to your path, not where to aim.
 
-## Licence
+## License
 
 GPL-3.0-or-later. See [LICENSE](LICENSE).
